@@ -1,0 +1,95 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 7 0 R /F2 8 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 7 0 R /F2 8 0 R >> >> /Contents 6 0 R >>
+endobj
+5 0 obj
+<< /Length 3068 >>
+stream
+BT /F2 18 Tf 55 794 Td (Résumé du projet - Plateforme e-learning SaaS) Tj ET
+BT /F2 13 Tf 55 756 Td (Concept) Tj ET
+BT /F1 10 Tf 55 735 Td (Le projet consiste à créer une plateforme SaaS d'e-learning) Tj ET
+BT /F1 10 Tf 55 721 Td (permettant aux étudiants d'apprendre avec des cours structurés) Tj ET
+BT /F1 10 Tf 55 707 Td (combinant vidéos, contenus écrits et commentaires.) Tj ET
+BT /F2 13 Tf 55 677 Td (Problème métier) Tj ET
+BT /F1 10 Tf 55 656 Td (Les ressources d'apprentissage sont souvent dispersées entre) Tj ET
+BT /F1 10 Tf 55 642 Td (plusieurs outils. Les étudiants manquent d'un espace) Tj ET
+BT /F1 10 Tf 55 628 Td (centralisé pour suivre les cours, poser des questions et) Tj ET
+BT /F1 10 Tf 55 614 Td (visualiser leur progression.) Tj ET
+BT /F2 13 Tf 55 584 Td (Solution proposée) Tj ET
+BT /F1 10 Tf 55 563 Td (La plateforme centralise les cours en ligne. Les enseignants) Tj ET
+BT /F1 10 Tf 55 549 Td (peuvent créer des cours et des leçons, ajouter des vidéos et) Tj ET
+BT /F1 10 Tf 55 535 Td (du texte, puis répondre aux commentaires des étudiants. Les) Tj ET
+BT /F1 10 Tf 55 521 Td (étudiants peuvent suivre les leçons, commenter et suivre leur) Tj ET
+BT /F1 10 Tf 55 507 Td (progression.) Tj ET
+BT /F2 13 Tf 55 477 Td (Acteurs) Tj ET
+BT /F1 10 Tf 55 456 Td (- Étudiant : consulte les cours, suit les leçons, commente et) Tj ET
+BT /F1 10 Tf 55 442 Td (suit sa progression.) Tj ET
+BT /F1 10 Tf 55 428 Td (- Enseignant : crée et gère les cours, les vidéos, les) Tj ET
+BT /F1 10 Tf 55 414 Td (contenus écrits et les réponses.) Tj ET
+BT /F1 10 Tf 55 400 Td (- Administrateur : gère les utilisateurs, les cours et la) Tj ET
+BT /F1 10 Tf 55 386 Td (modération des commentaires.) Tj ET
+BT /F2 13 Tf 55 356 Td (Fonctionnalités principales) Tj ET
+BT /F1 10 Tf 55 335 Td (- Authentification et gestion des rôles.) Tj ET
+BT /F1 10 Tf 55 321 Td (- Catalogue de cours avec catégories.) Tj ET
+BT /F1 10 Tf 55 307 Td (- Leçons avec vidéo et contenu texte.) Tj ET
+BT /F1 10 Tf 55 293 Td (- Commentaires liés aux leçons.) Tj ET
+BT /F1 10 Tf 55 279 Td (- Réponses des enseignants.) Tj ET
+BT /F1 10 Tf 55 265 Td (- Suivi de progression des étudiants.) Tj ET
+BT /F1 10 Tf 55 251 Td (- Interface responsive desktop et mobile.) Tj ET
+BT /F2 13 Tf 55 221 Td (Règles importantes) Tj ET
+BT /F1 10 Tf 55 200 Td (- Un utilisateur doit être connecté pour commenter ou accéder) Tj ET
+BT /F1 10 Tf 55 186 Td (aux contenus privés.) Tj ET
+BT /F1 10 Tf 55 172 Td (- Un cours doit contenir au moins une leçon avant publication.) Tj ET
+BT /F1 10 Tf 55 158 Td (- Une leçon peut contenir une vidéo, du texte, ou les deux.) Tj ET
+BT /F1 10 Tf 55 144 Td (- Les commentaires doivent respecter des règles de modération.) Tj ET
+BT /F1 10 Tf 55 130 Td (- Les enseignants ne peuvent modifier que leurs propres cours,) Tj ET
+BT /F1 10 Tf 55 116 Td (sauf administrateur.) Tj ET
+BT /F2 13 Tf 55 86 Td (Contraintes du syllabus) Tj ET
+BT /F1 10 Tf 55 65 Td (- Gestion du projet en Agile avec un outil de suivi.) Tj ET
+BT /F1 10 Tf 55 51 Td (- Utilisation de Git et d'un workflow de branches.) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Length 593 >>
+stream
+BT /F1 10 Tf 55 800 Td (- Maquettes avec Figma, Penpot ou équivalent.) Tj ET
+BT /F1 10 Tf 55 786 Td (- Modèle de données SQL à justifier.) Tj ET
+BT /F1 10 Tf 55 772 Td (- Interface responsive sans React, Vue ou Angular.) Tj ET
+BT /F1 10 Tf 55 758 Td (- Backend/API avec logique métier.) Tj ET
+BT /F1 10 Tf 55 744 Td (- Conteneurisation avec Docker et compose.yml.) Tj ET
+BT /F1 10 Tf 55 730 Td (- Déploiement public avec nom de domaine et certificat SSL.) Tj ET
+BT /F1 10 Tf 55 716 Td (- Sécurité contre CSRF, injection SQL, XSS et exposition des) Tj ET
+BT /F1 10 Tf 55 702 Td (secrets.) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+8 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000257 00000 n 
+0000000393 00000 n 
+0000003513 00000 n 
+0000004157 00000 n 
+0000004254 00000 n 
+trailer
+<< /Size 9 /Root 1 0 R >>
+startxref
+4356
+%%EOF
