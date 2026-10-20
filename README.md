@@ -161,3 +161,7 @@ During the final presentation, the team should demonstrate:
 - The database model and technical choices.
 - Dockerized environment and deployed production version.
 - Security measures implemented in the application.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch workflow, commit conventions, Definition of Done and sprint organisation. Tasks are tracked on the [project board](https://github.com/users/lucaszebre/projects/12).
