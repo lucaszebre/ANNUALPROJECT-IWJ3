@@ -1,44 +1,28 @@
 # Data model
 
-The SQL data model of the code learning platform, and why it looks this way. This is the document we defend at the final presentation (syllabus › Modélisation).
+The database of the code learning platform, drawn before implementation, with the reasons behind each abstraction. This is the document we defend at the final presentation (syllabus › Modélisation). The tables will be implemented later as Laravel migrations and Eloquent models.
 
-- Reference DDL: [`data-model/schema.sql`](data-model/schema.sql) (PostgreSQL 18)
-- Executable checks of the business rules: [`data-model/checks.sql`](data-model/checks.sql)
+Target: **Laravel 12+** with **PostgreSQL** (needed for full-text search with French stemming).
 
-```sh
-docker run -d --rm --name pg -e POSTGRES_PASSWORD=test -p 55432:5432 postgres:18
-PGPASSWORD=test psql -h localhost -p 55432 -U postgres -v ON_ERROR_STOP=1 -q \
-  -f docs/data-model/schema.sql -f docs/data-model/checks.sql
-# ... "All data model checks passed."
-```
+## 1. Conventions
 
-## 1. Choices in one page
+- Laravel naming: plural `snake_case` tables, `id` primary key, foreign keys named `<model>_id` (so `foreignUuid('course_id')->constrained()` finds `courses` by itself).
+- Every table has `created_at` / `updated_at` (`$table->timestamps()`); they are not repeated in the diagrams.
+- Primary keys are **UUIDs** (`HasUuids` trait, which generates ordered UUID v7 since Laravel 12), except for the two high-volume internal tables `transcript_segments` and `playback_events`, which use a normal auto-increment `id()`.
+- Status columns are strings backed by **PHP enums** (`VideoStatus::Ready`) and cast in the model.
+- Files (videos, HLS playlists, thumbnails) live on the `s3` disk (MinIO). The database only stores their **paths**.
 
-| Decision | Choice | Main reason |
-|---|---|---|
-| Database | PostgreSQL only | Relational data with strong rules, and the same database also runs the job queue and full-text search: one service to run on a 5-10 €/month VPS. |
-| Multi-tenancy | Shared schema, `org_id` on every tenant table, row-level security | Isolation is enforced by the database even if the API has a bug, without running one database per customer. |
-| Cross-tenant integrity | Composite foreign keys `(org_id, id)` | A lesson cannot point to a course of another organisation; not even by mistake. |
-| Users | Global `users` + `memberships(org_id, user_id, role)` | The same person can teach in one organisation and study in another. |
-| Primary keys | `uuidv7()` | Not guessable in URLs (limits IDOR attempts), time-ordered so inserts stay index-friendly. |
-| Lesson content | Optional 1-to-1 tables: `videos`, `exercises`, `quizzes` + `lessons.body_markdown` | Any combination of video / text / exercise is possible, each with real columns and constraints. |
-| Search | `tsvector` generated column on transcript segments + GIN index | Search down to the second, with French stemming, without Elasticsearch. |
-| Prerequisites | Edge table + trigger that rejects cycles | The graph is guaranteed to stay a DAG. |
-| Job queue | One `jobs` table, `FOR UPDATE SKIP LOCKED` | Transcoding, transcription and code execution are three job types on one queue (the central argument of the project). |
-| Analytics | Monthly-partitioned `playback_events`, aggregated into `video_retention` | High-volume events are cheap to insert and cheap to delete. |
+## 2. Overview (conceptual model)
 
-## 2. Conceptual model
-
-Entities and how they relate, without technical columns.
+What exists and how it is related, without technical columns.
 
 ```mermaid
 erDiagram
     ORGANIZATION ||--o{ MEMBERSHIP : has
     USER ||--o{ MEMBERSHIP : "belongs through"
-    ORGANIZATION ||--|| QUOTA : "is limited by"
     ORGANIZATION ||--o{ CATEGORY : defines
     CATEGORY |o--o{ COURSE : classifies
-    MEMBERSHIP ||--o{ COURSE : "owns (teacher)"
+    USER ||--o{ COURSE : "owns (teacher)"
     COURSE ||--|{ LESSON : contains
     LESSON |o--o| VIDEO : "may have"
     LESSON |o--o| EXERCISE : "may have"
@@ -49,149 +33,163 @@ erDiagram
     COMMENT |o--o{ COMMENT : "is answered by"
     EXERCISE ||--|{ EXERCISE_TEST : "is graded by"
     EXERCISE ||--o{ SUBMISSION : receives
-    SUBMISSION ||--|{ SUBMISSION_RESULT : "produces one per test"
+    SUBMISSION ||--|{ SUBMISSION_RESULT : "one per test"
     QUIZ ||--|{ QUESTION : contains
     QUESTION ||--|{ CHOICE : offers
     QUIZ ||--o{ QUIZ_ATTEMPT : receives
-    MEMBERSHIP ||--o{ ENROLLMENT : "follows course"
-    MEMBERSHIP ||--o{ LESSON_PROGRESS : completes
+    USER }o--o{ COURSE : "enrolls in"
+    USER }o--o{ LESSON : completes
     VIDEO ||--o{ PLAYBACK_EVENT : "is watched"
-    ORGANIZATION |o--o{ JOB : "queues work"
 ```
 
-A course needs at least one lesson to be **published** (drafts can be empty), which the diagram shows as `||--|{` and the database enforces with a trigger.
+A draft course can be empty, but a course needs at least one lesson to be **published**.
 
-## 3. Logical model
+## 3. Detailed diagrams
 
-Tables, keys and the main columns, split by area. All tables except `users`, `sessions` and `jobs` have an `org_id` column, omitted below where it is only there for isolation.
+Every tenant table has an `organization_id` column (see [decision 4.1](#41-organisations-one-database-shared-by-all-organisations)); it is shown only where it matters.
 
-### 3.1 Tenancy and identity
+### 3.1 Organisations and users
 
 ```mermaid
 erDiagram
     organizations ||--o{ memberships : ""
     users ||--o{ memberships : ""
     users ||--o{ sessions : ""
-    organizations ||--|| org_quotas : ""
     organizations {
         uuid id PK
-        text name
-        text slug UK
+        string name
+        string slug UK
+        bigint video_storage_quota_bytes
+        int code_runs_quota_monthly
     }
     users {
         uuid id PK
-        text email UK "unique on lower(email)"
-        text password_hash "NULL if OAuth only"
-        text display_name
-        bool is_active
+        string name
+        string email UK
+        string password "hashed, nullable for OAuth-only accounts"
+        timestamp email_verified_at
+        string remember_token
     }
     memberships {
-        uuid org_id PK, FK
-        uuid user_id PK, FK
-        member_role role "student | teacher | admin"
+        uuid id PK
+        uuid organization_id FK
+        uuid user_id FK
+        string role "MemberRole enum: student | teacher | admin"
     }
     sessions {
-        bytea token_hash PK "hash of the cookie, never the token"
+        string id PK "Laravel database sessions"
         uuid user_id FK
-        uuid org_id FK "active organisation"
-        timestamptz expires_at
-    }
-    org_quotas {
-        uuid org_id PK, FK
-        bigint max_video_storage_bytes
-        int max_code_runs_per_month
+        text payload "includes the current organisation id"
+        int last_activity
     }
 ```
+
+`memberships` has a unique index on `(organization_id, user_id)`.
 
 ### 3.2 Courses, lessons, videos and comments
 
 ```mermaid
 erDiagram
+    organizations ||--o{ categories : ""
     categories |o--o{ courses : ""
-    memberships ||--o{ courses : "owner"
+    users ||--o{ courses : "owner_id"
     courses ||--o{ lessons : ""
     lessons |o--o| videos : ""
     videos ||--o{ transcript_segments : ""
     lessons ||--o{ comments : ""
     comments |o--o{ comments : "parent_id"
     comments ||--o{ comment_reports : ""
+    categories {
+        uuid id PK
+        uuid organization_id FK
+        string name
+        string slug "unique per organisation"
+    }
     courses {
         uuid id PK
-        uuid org_id FK
-        uuid owner_id FK "(org_id, owner_id) -> memberships"
-        uuid category_id FK
-        text slug "unique per org"
-        course_status status "draft | published | archived"
-        timestamptz published_at
+        uuid organization_id FK
+        uuid owner_id FK "users"
+        uuid category_id FK "nullable"
+        string title
+        string slug "unique per organisation"
+        text description
+        string status "CourseStatus: draft | published | archived"
+        timestamp published_at
+        timestamp deleted_at "soft delete"
     }
     lessons {
         uuid id PK
-        uuid course_id FK "(org_id, course_id) -> courses"
-        int position "unique per course, deferrable"
-        text title
-        text body_markdown "text part, optional"
+        uuid organization_id FK
+        uuid course_id FK
+        int position "unique per course"
+        string title
+        text content "Markdown text, nullable"
     }
     videos {
         uuid id PK
-        uuid lesson_id FK, UK
-        video_status status "uploaded | processing | ready | failed"
-        text source_object_key "MinIO"
-        text hls_master_key "required when ready"
-        int duration_ms
-        bigint storage_bytes "for quotas"
-        regconfig language "french | english"
-        transcript_status transcript_status
+        uuid organization_id FK
+        uuid lesson_id FK "unique: 0 or 1 video per lesson"
+        string status "VideoStatus: uploaded | processing | ready | failed"
+        string source_path "original upload on MinIO"
+        string hls_path "master.m3u8, set when ready"
+        string thumbnail_path
+        int duration_seconds
+        bigint size_bytes "source + HLS, for the quota"
+        string language "fr | en, for Whisper"
+        string transcript_status "pending | processing | ready | failed"
+        timestamp ready_at
     }
     transcript_segments {
         bigint id PK
+        uuid organization_id FK
         uuid video_id FK
         int start_ms
         int end_ms
-        text text
-        tsvector tsv "generated, GIN index"
+        text text "fullText index (french)"
     }
     comments {
         uuid id PK
+        uuid organization_id FK
         uuid lesson_id FK
-        uuid author_id FK
-        uuid parent_id FK "replies, one level"
-        int timecode_ms "optional"
-        text body "1 to 5000 chars"
-        comment_status status "visible | hidden | deleted"
+        uuid user_id FK
+        uuid parent_id FK "nullable: replies, one level"
+        int timecode_seconds "nullable: moment in the video"
+        text body
+        string status "CommentStatus: visible | hidden"
+        timestamp deleted_at "soft delete"
     }
     comment_reports {
-        uuid comment_id PK, FK
-        uuid reporter_id PK, FK
-        text reason
-        timestamptz resolved_at
+        uuid id PK
+        uuid comment_id FK
+        uuid user_id FK "unique with comment_id"
+        string reason
+        timestamp resolved_at
     }
 ```
 
-### 3.3 Exercises, quizzes, learning path and progress
+### 3.3 Exercises and quizzes
 
 ```mermaid
 erDiagram
     lessons |o--o| exercises : ""
     exercises ||--o{ exercise_tests : ""
     exercises ||--o{ submissions : ""
+    users ||--o{ submissions : ""
     submissions ||--o{ submission_results : ""
     exercise_tests ||--o{ submission_results : ""
     lessons |o--o| quizzes : ""
     quizzes ||--o{ quiz_questions : ""
     quiz_questions ||--o{ quiz_choices : ""
     quizzes ||--o{ quiz_attempts : ""
-    quiz_attempts ||--o{ quiz_attempt_answers : ""
-    lessons ||--o{ lesson_prerequisites : "lesson_id"
-    lessons ||--o{ lesson_prerequisites : "prerequisite_id"
-    lessons ||--o{ lesson_progress : ""
-    courses ||--o{ enrollments : ""
+    users ||--o{ quiz_attempts : ""
+    quiz_attempts }o--o{ quiz_choices : "quiz_attempt_choice"
     exercises {
         uuid id PK
-        uuid lesson_id FK, UK
-        code_language language "python | javascript"
-        text statement_markdown
+        uuid lesson_id FK "unique"
+        string language "CodeLanguage: python | javascript"
+        text statement "Markdown"
         text starter_code
-        text solution_code "never sent to students"
+        text solution_code "hidden from students"
         int time_limit_ms
         int memory_limit_mb
     }
@@ -199,6 +197,7 @@ erDiagram
         uuid id PK
         uuid exercise_id FK
         int position
+        string name
         text stdin
         text expected_stdout
         bool is_hidden
@@ -207,265 +206,280 @@ erDiagram
         uuid id PK
         uuid exercise_id FK
         uuid user_id FK
-        text code "max 64 KiB"
-        submission_status status "queued | running | passed | failed | error"
+        text code
+        string status "SubmissionStatus: queued | running | passed | failed | error"
         int tests_passed
         int tests_total
+        timestamp finished_at
     }
     submission_results {
-        uuid submission_id PK, FK
-        uuid test_id PK, FK
+        uuid id PK
+        uuid submission_id FK
+        uuid exercise_test_id FK
         bool passed
         text actual_stdout "truncated"
-        text stderr
+        text stderr "truncated"
+        int duration_ms
         bool timed_out
     }
     quizzes {
         uuid id PK
-        uuid lesson_id FK, UK
-        smallint pass_threshold_pct
+        uuid lesson_id FK "unique"
+        int pass_threshold_percent
     }
     quiz_questions {
         uuid id PK
         uuid quiz_id FK
-        question_kind kind "single | multiple"
+        int position
+        text prompt
+        bool multiple "several correct choices"
     }
     quiz_choices {
         uuid id PK
-        uuid question_id FK
-        bool is_correct "server-side only"
+        uuid quiz_question_id FK
+        string label
+        bool is_correct "hidden from students"
     }
     quiz_attempts {
         uuid id PK
         uuid quiz_id FK
         uuid user_id FK
-        smallint score_pct
+        int score_percent
         bool passed
     }
-    quiz_attempt_answers {
-        uuid attempt_id PK, FK
-        uuid choice_id PK, FK "(question_id, choice_id) -> quiz_choices"
-    }
+```
+
+### 3.4 Learning path and progress
+
+```mermaid
+erDiagram
+    lessons ||--o{ lesson_prerequisites : "lesson_id"
+    lessons ||--o{ lesson_prerequisites : "prerequisite_id"
+    users ||--o{ enrollments : ""
+    courses ||--o{ enrollments : ""
+    users ||--o{ lesson_completions : ""
+    lessons ||--o{ lesson_completions : ""
     lesson_prerequisites {
-        uuid lesson_id PK, FK
-        uuid prerequisite_id PK, FK "no cycle (trigger)"
+        uuid lesson_id PK, FK "this lesson..."
+        uuid prerequisite_id PK, FK "...requires this one"
     }
     enrollments {
         uuid user_id PK, FK
         uuid course_id PK, FK
+        timestamp created_at "enrolled at"
     }
-    lesson_progress {
+    lesson_completions {
         uuid user_id PK, FK
         uuid lesson_id PK, FK
-        progress_source source "manual | exercise | quiz"
-        timestamptz completed_at
+        string source "manual | exercise | quiz"
+        timestamp created_at "completed at"
     }
 ```
 
-### 3.4 Analytics and job queue
+### 3.5 Analytics and background jobs
 
 ```mermaid
 erDiagram
     videos ||--o{ playback_events : ""
-    videos ||--o{ video_retention : ""
-    organizations |o--o{ jobs : ""
+    users ||--o{ playback_events : ""
+    videos ||--o{ video_retention_stats : ""
     playback_events {
         bigint id PK
-        timestamptz occurred_at PK "partition key, 1 partition per month"
+        uuid organization_id FK
         uuid video_id FK
         uuid user_id FK
-        uuid playback_session_id
-        playback_event event "play | pause | seek | heartbeat | ended"
-        int position_ms
+        uuid playback_session "one per player load"
+        string event "play | pause | seek | heartbeat | ended"
+        int position_seconds
+        timestamp occurred_at
     }
-    video_retention {
+    video_retention_stats {
         uuid video_id PK, FK
-        int bucket_start_s PK "10 s buckets"
+        int bucket_start_seconds PK "10 s buckets"
         int viewers
     }
     jobs {
-        uuid id PK
-        uuid org_id FK "NULL for system jobs"
-        job_type type "transcode | transcribe | run_code | aggregate_analytics"
-        jsonb payload
-        job_status status "queued | running | succeeded | failed | dead"
-        smallint priority
-        smallint attempts
-        timestamptz run_at
-        timestamptz locked_at
+        bigint id PK "Laravel database queue"
+        string queue "transcode | transcribe | sandbox | default"
+        text payload "serialized Job class"
+        int attempts
+        int reserved_at
+        int available_at
+    }
+    failed_jobs {
+        bigint id PK
+        string uuid UK
+        text payload
+        text exception
+        timestamp failed_at
     }
 ```
 
-`exercise_stats` (failure rate per exercise) is a view over `exercises` and `submissions`.
+`jobs` and `failed_jobs` are Laravel's own tables (`php artisan make:queue-table`); they have no relation to the domain tables because a job only carries the ids it needs in its payload.
 
-## 4. Justification
+## 4. Abstraction decisions
 
-### 4.1 Why PostgreSQL, and only PostgreSQL
+Each choice below lists what we considered and why we picked one.
 
-The domain is strongly relational: an organisation has courses, a course has ordered lessons, a lesson has optional content, students have progress on lessons. Most business rules are relationships ("the owner must be a member", "the answer must belong to the question"), which foreign keys and constraints express better than application code.
-
-PostgreSQL also covers two needs that would otherwise require extra services:
-
-- **Job queue.** `SELECT ... FOR UPDATE SKIP LOCKED` lets several workers take jobs without ever getting the same one. The real benefit is **transactional enqueueing**: the API inserts the `videos` row and its `transcode` job in the same transaction, so a video can never be saved without its job (or the reverse), which is impossible to guarantee with Redis or RabbitMQ next to the database.
-- **Full-text search.** `tsvector` with the `french` configuration handles stemming ("fonctions récursives" finds "Une fonction récursive", see `checks.sql`). For a few hundred hours of video, a GIN index is more than enough, and we avoid running Elasticsearch on a small VPS.
-
-Fewer services means a smaller VPS, a simpler `compose.yml`, and one backup to manage.
-
-### 4.2 Multi-tenancy: shared schema with row-level security
+### 4.1 Organisations: one database shared by all organisations
 
 Business rule: *the data of an organisation is never accessible from another organisation.*
 
-| Option | Isolation | Cost to run | Verdict |
-|---|---|---|---|
-| One database per organisation | Very strong | One DB, migrations and backups per customer | Too heavy for us |
-| One schema per organisation | Strong | Migrations run N times, connection pool per schema | Complex |
-| **Shared schema + `org_id` + RLS** | **Strong, enforced by PostgreSQL** | **One schema, one migration** | **Chosen** |
+| Option | Verdict |
+|---|---|
+| One database per organisation (e.g. `stancl/tenancy`) | Strongest isolation, but N databases to migrate and back up on a small VPS. Too heavy. |
+| One schema per organisation | Same problem, and harder to explain. |
+| **One shared database, `organization_id` on every tenant table** | **Chosen.** One migration, one backup, and Laravel makes the filtering automatic. |
 
-We use three layers, so a single mistake is never enough to leak data:
+How it works in Laravel:
 
-1. **`org_id` on every tenant table**, even when it could be found through a join (`lessons.org_id` duplicates `courses.org_id`). That makes each row self-describing, which row-level security needs.
-2. **Composite foreign keys `(org_id, x_id) → parent(org_id, id)`.** The database refuses a lesson of org B in a course of org A, even when inserted by an admin script.
-3. **Row-level security with `FORCE`.** The API runs `SET LOCAL app.org_id = ...` at the start of each transaction. Every query, including a forgotten `WHERE`, only sees the active organisation. If the API forgets to set it, `current_org_id()` is `NULL` and **no row is returned**: it fails closed.
+- A `BelongsToOrganization` trait, used by every tenant model, adds a **global scope** `where organization_id = <current organisation>` and fills `organization_id` automatically on `creating`. Developers cannot forget the filter: `Course::find($id)` on a course of another organisation returns `null`, so route model binding gives a 404.
+- A middleware resolves the current organisation from the session and refuses the request if the user is not a member of it.
+- Validation uses `Rule::exists('courses', 'id')->where('organization_id', ...)`, so an id from another organisation cannot be submitted in a form.
+- Feature tests check, for every resource, that a user of organisation A gets a 404 on organisation B's data.
 
-`users` and `sessions` are global because login happens before we know the organisation. A user can still see their own memberships in other organisations (to switch organisation) through a dedicated policy, and nothing else.
+Why `organization_id` is repeated on child tables (`lessons`, `videos`, `comments`...) when it could be reached through `course_id`: the global scope works on one table without joins. It is a small, deliberate redundancy that makes every query safe by default.
 
-### 4.3 Users and memberships
+`users` is global (not scoped) because login happens before we know the organisation.
 
-A role belongs to a **membership**, not a user: the PDF describes a teacher who manages *their* courses inside *an* organisation. Putting the role on `users` would forbid someone from being a teacher in one school and a student in another. `courses.owner_id` references `memberships(org_id, user_id)`, so a course owner is necessarily a member of the course's organisation, and a teacher cannot be removed while they still own courses (ownership must be transferred first).
+### 4.2 Roles: a `memberships` table, not a column on `users`
 
-### 4.4 Identifiers: UUID v7
+The same person can be a teacher in one organisation and a student in another, so the role belongs to the link between a user and an organisation:
 
-- Not guessable: `/courses/42` invites trying `/courses/43`; a UUID does not. Authorisation is still checked, this is defence in depth.
-- Generated in the database (`uuidv7()`, new in PostgreSQL 18) or the application, without a round trip.
-- Unlike random UUID v4, v7 starts with a timestamp, so new rows go to the end of the B-tree index like a serial would.
-
-`transcript_segments` and `playback_events` use `bigint` identities: they are never exposed in URLs and are the highest-volume tables, where 8 bytes beat 16.
-
-### 4.5 Lesson content: one optional table per content type
-
-The rule is "a lesson can contain a video, text, an exercise, or a combination". We chose:
-
-- `lessons.body_markdown` for the text (nullable),
-- `videos`, `exercises`, `quizzes` with `lesson_id UNIQUE`: zero or one of each per lesson.
-
-Alternatives we rejected:
-
-- **One `content` JSON column:** no foreign keys, no constraints, no way to say "a ready video must have an HLS playlist".
-- **A generic `content_blocks(type, data)` table:** flexible, but every query has to branch on `type`, and type-specific columns (`duration_ms`, `time_limit_ms`) become untyped.
-
-Limiting to one exercise per lesson keeps "lesson completed" simple (pass the exercise ⇒ lesson done). If we need several exercises later, dropping the `UNIQUE` on `exercises.lesson_id` is enough.
-
-### 4.6 Videos
-
-`videos.status` is a small state machine `uploaded → processing → ready | failed`. Rule: *a video is only visible once transcoding is finished*. The API only returns `ready` videos to students, and a `CHECK` makes `ready` impossible without `hls_master_key`, `duration_ms` and `ready_at`: a bug in the worker cannot publish a broken video.
-
-We store **object keys** in MinIO, not URLs: the API generates short-lived signed URLs, so moving storage or changing the domain does not require migrating data. `storage_bytes` (source + HLS renditions) feeds the storage quota.
-
-### 4.7 Transcripts and search
-
-The transcript is stored as **segments** (`start_ms`, `end_ms`, `text`) as returned by Whisper, not as one big text. That is what makes the search "precise to the second": each search hit is a segment, so we can open the video at `start_ms`. The same rows produce the WebVTT subtitles.
-
-`tsv` is a **generated column** `to_tsvector(language, text)`: PostgreSQL computes it on insert, so it can never be out of date. The language (`french` / `english`) is stored per video because stemming depends on it. Since every segment carries `org_id`, search results are filtered by row-level security like everything else (checked in `checks.sql`).
-
-### 4.8 Comments
-
-- `parent_id` (adjacency list) with **one level of replies**, enforced by a trigger. Students ask, teachers answer; deeper threads add UI complexity for no real need.
-- `timecode_ms` nullable: a comment can be about the whole lesson or a precise moment of the video. A partial index `(lesson_id, timecode_ms) WHERE timecode_ms IS NOT NULL` serves the markers on the player.
-- Moderation: `status` (`visible`, `hidden`, `deleted`) instead of `DELETE`, so a deleted question does not break the thread of answers, plus `comment_reports` (one report per user and comment, primary key `(comment_id, reporter_id)`).
-- Body length is checked in the database (1 to 5000 characters). XSS protection happens on output, not storage: we store what the user typed and escape it when rendering.
-
-### 4.9 Code exercises
-
-- Tests are **input/output** (`stdin`, `expected_stdout`): the sandbox runs the program, feeds `stdin`, and compares the output. This is the same for every language and does not require a test framework inside the sandbox image.
-- `is_hidden` tests and `solution_code` never leave the server: students see the result of a hidden test (passed / failed), not its content.
-- `submission_results` has one row per test, which gives the "failure rate **per test**" for teachers, not only per exercise.
-- Outputs are truncated by the runner and limited in the database (16 KiB) so a student's infinite `print` loop cannot fill the disk.
-- Code size is limited to 64 KiB.
-
-### 4.10 Learning path: a DAG of prerequisites
-
-`lesson_prerequisites(lesson_id, prerequisite_id)` is an **edge list**: "lesson_id requires prerequisite_id". Rule: *prerequisites cannot form a cycle*. A trigger walks the existing prerequisites with a recursive query and refuses an edge that would close a loop. An advisory lock per organisation prevents two concurrent inserts from each creating half of a cycle.
-
-A closure table (storing every ancestor/descendant pair) would make reads faster but writes complex; with a few dozen lessons per course and rare edits, the edge list is the simpler choice.
-
-Unlocking is computed, not stored: a lesson is unlocked for a student when every prerequisite has a row in `lesson_progress`. The query is in `checks.sql`.
-
-### 4.11 Progress
-
-One row in `lesson_progress` means "this user completed this lesson", with `source` (`manual`, `exercise`, `quiz`). Course progress (completed / total) is **computed**, never stored, so it stays correct when a teacher adds a lesson. `enrollments` records which courses a student follows; it drives "my learning" and is the denominator of the analytics.
-
-### 4.12 Analytics
-
-- `playback_events` is the highest-volume table (one heartbeat every ~10 s per viewer). It is **partitioned by month**: inserts stay fast and old data is removed with `DROP TABLE` on a partition, instantly, instead of a huge `DELETE`. Partitions are created ahead of time by a scheduled job.
-- The drop-off curve is pre-computed into `video_retention` by the `aggregate_analytics` job. We use a table rather than a materialized view because **materialized views do not support row-level security**, and the dashboard must stay tenant-isolated.
-- The exercise failure rate is a plain view (`exercise_stats`) because submissions are low-volume. It is declared `security_invoker` so it applies the caller's row-level security; without it, a view runs with its owner's rights and would leak across organisations (checked in `checks.sql`).
-
-### 4.13 Job queue
-
-One table for every job type, as the project's central argument requires. A worker claims a job with:
-
-```sql
-UPDATE jobs SET status = 'running', locked_at = now(), locked_by = $worker, attempts = attempts + 1
-WHERE id = (
-  SELECT id FROM jobs
-  WHERE status = 'queued' AND type = ANY($types) AND run_at <= now()
-  ORDER BY priority DESC, run_at
-  FOR UPDATE SKIP LOCKED
-  LIMIT 1
-)
-RETURNING *;
+```php
+// User.php
+public function organizations(): BelongsToMany
+{
+    return $this->belongsToMany(Organization::class, 'memberships')
+        ->using(Membership::class)
+        ->withPivot('role');
+}
 ```
 
-- `SKIP LOCKED` lets several workers poll at the same time without blocking or taking the same job.
-- A **partial index** `WHERE status = 'queued'` only contains waiting jobs, so it stays small however many finished jobs accumulate.
-- `type = ANY($types)` lets us run dedicated workers: transcription (CPU-heavy, concurrency 1) does not block code execution (must answer in seconds).
-- `attempts`, `max_attempts` and `run_at` give retries with backoff; after the last attempt the job goes to `dead`.
-- The API role may only `INSERT` into `jobs`; the UI reads the status of the domain row (`videos.status`, `submissions.status`), never the queue.
+We considered `spatie/laravel-permission`. It is well suited to many fine-grained permissions, but we only have three fixed roles, and its tables would add complexity for no gain. A `MemberRole` PHP enum on the pivot plus **Policies** (`CoursePolicy::update`: owner or admin) covers the rules and is easy to explain.
 
-If the team picks pg-boss in the stack decision (#3), it brings its own tables but works on the same principle; the domain tables do not change.
+### 4.3 Lessons: one container with optional typed content
 
-### 4.14 Security in the schema
+Rule: *a lesson can contain a video, text, an exercise, or a combination of the three.*
 
-- Database roles: `app_api` (subject to row-level security, cannot read `jobs`), `app_worker`. Passwords come from secrets at deploy time, never from the repository. Migrations run as the table owner.
-- Passwords are stored as hashes (argon2/bcrypt, done by the API); session cookies are stored as **hashes of the token**, so a database dump does not allow hijacking sessions.
-- SQL injection is prevented in the application by parameterised queries only; the database adds size limits and `CHECK` constraints so invalid data cannot get in even through a bug.
+| Option | Verdict |
+|---|---|
+| A JSON `content` column | No foreign keys, no constraints, hard to query. |
+| Polymorphic content blocks (`lesson_items` with `morphTo`) | Very flexible (any number of blocks, any order), but Eloquent polymorphic relations cannot have real foreign keys, and every screen must branch on the block type. Flexibility we do not need. |
+| **A `lessons` table with `content` (text) + optional `videos`, `exercises`, `quizzes` linked 1-to-1** | **Chosen.** Each content type has its own columns (`duration_seconds`, `time_limit_ms`...), real foreign keys, and simple relations: `$lesson->video`, `$lesson->exercise`. |
+
+The 1-to-1 is enforced with a unique index on `lesson_id`. If we later want several exercises per lesson, we only remove that unique index and change `hasOne` to `hasMany`.
+
+### 4.4 Videos: a status, and paths instead of files
+
+Rule: *a video is only visible once its transcoding is finished.*
+
+- `status` follows `uploaded → processing → ready | failed`. A local scope `Video::ready()` is used for everything students see, and `hls_path` is only set when the transcode job succeeds.
+- The database stores **paths** on the MinIO disk, never URLs or files. The application generates temporary signed URLs (`Storage::temporaryUrl()`), so videos are never public and the storage can move without a data migration.
+- `size_bytes` feeds the video storage quota: `Video::sum('size_bytes')` for the organisation.
+
+### 4.5 Transcripts: segments, not one big text
+
+Whisper returns timed segments. We keep them as rows (`start_ms`, `end_ms`, `text`) instead of one text per video because that is what makes search "precise to the second": each search hit is a segment, so we can open the video at `start_ms`. The same rows produce the subtitle file (WebVTT).
+
+Search uses PostgreSQL full text, natively supported by Laravel, instead of a search engine like Meilisearch or Elasticsearch:
+
+```php
+$table->fullText('text')->language('french');                    // migration: GIN index
+TranscriptSegment::whereFullText('text', $q, ['language' => 'french'])->get(); // query
+```
+
+French stemming means "fonctions récursives" also finds "une fonction récursive". One less service to run on the VPS.
+
+### 4.6 Comments: one table for questions, answers and timecoded comments
+
+- Replies use `parent_id` (self-relation) with **one level** only: a student asks, the teacher answers. Deeper threads would complicate the UI for no real need. The rule is checked in the Form Request.
+- `timecode_seconds` is nullable: a comment is either about the whole lesson or about a moment of the video. No separate table for "timecoded comments": same data, same moderation.
+- We did not make comments polymorphic (`commentable`): they only ever target lessons, and a normal foreign key keeps integrity.
+- Moderation: `status` (`visible` / `hidden`) for moderators, `SoftDeletes` for deletion (so a deleted question does not break the thread of answers), and `comment_reports` (unique per user and comment) for reports.
+- Comments are stored as typed and escaped on output by Blade (`{{ }}`), which protects against XSS.
+
+### 4.7 Code exercises: input/output tests
+
+- A test is a row with `stdin` and `expected_stdout`: the sandbox runs the student's program, sends `stdin`, compares the output. It works the same for every language, and the sandbox image does not need a test framework.
+- `is_hidden` tests and `solution_code` never leave the server (excluded with `$hidden` on the model and in API resources). Students see whether a hidden test passed, not its content.
+- One `submission_results` row per test gives the teacher the failure rate **per test**, not only per exercise.
+
+### 4.8 Learning path: prerequisites as a graph
+
+Rule: *a lesson stays locked until its prerequisites are validated; prerequisites cannot form a cycle.*
+
+`lesson_prerequisites` is a self-referencing many-to-many on `lessons`:
+
+```php
+public function prerequisites(): BelongsToMany
+{
+    return $this->belongsToMany(Lesson::class, 'lesson_prerequisites', 'lesson_id', 'prerequisite_id');
+}
+```
+
+This allows a real graph (a lesson can require two others), not only a linear order. Before saving an edge, a `PrerequisiteGraph` service walks the existing prerequisites and refuses the edge if it would close a loop. It runs in a transaction that locks the course, so two teachers cannot each create half of a cycle at the same time.
+
+A lesson is **unlocked** when all of its prerequisites appear in the student's `lesson_completions`. This is computed, not stored.
+
+### 4.9 Progress: store completions, compute percentages
+
+A row in `lesson_completions` means "this user completed this lesson", with its `source` (`manual` for text/video, `exercise` or `quiz` when validated automatically). Course progress (completed lessons / lessons) is **computed** on the fly. Storing a percentage would go wrong as soon as a teacher adds a lesson.
+
+`enrollments` records which courses a student follows: it drives the "my learning" page and is the denominator for analytics.
+
+### 4.10 Analytics: raw events + pre-computed results
+
+- The player sends `playback_events` (play, pause, seek, a heartbeat every ~10 s). This is by far the largest table, so it has a plain `bigint` id, an index on `(video_id, occurred_at)`, and uses Laravel's **`MassPrunable`** to delete events older than a few months with a scheduled `model:prune`.
+- Computing the drop-off curve from raw events on every dashboard load would be slow, so a scheduled job aggregates it into `video_retention_stats` (viewers still watching per 10-second bucket).
+- The failure rate per exercise is computed directly from `submissions` and `submission_results`, which are small enough.
+
+### 4.11 Background jobs: one queue, three kinds of work
+
+The central argument of the project: transcoding, transcription and code execution are three kinds of jobs on **one** queue.
+
+We use Laravel's **database queue driver**: one `jobs` table in PostgreSQL, no Redis or RabbitMQ. Workers take jobs with `SELECT ... FOR UPDATE SKIP LOCKED`, so several workers never take the same job.
+
+| Job class | Queue | Updates |
+|---|---|---|
+| `TranscodeVideo` (ffmpeg → HLS) | `transcode` | `videos.status`, then dispatches `TranscribeVideo` |
+| `TranscribeVideo` (Whisper) | `transcribe` | `videos.transcript_status`, `transcript_segments` |
+| `RunSubmission` (Docker sandbox) | `sandbox` | `submissions.status`, `submission_results` |
+| `AggregateVideoRetention` (scheduled) | `default` | `video_retention_stats` |
+
+Separate queue names let us run dedicated workers (`queue:work --queue=sandbox`): a long Whisper transcription never delays a student waiting for their code result. The UI never reads the `jobs` table. It shows the status of the domain row (`videos.status`, `submissions.status`), which the job updates.
+
+### 4.12 Quotas: two columns on `organizations`
+
+Rule: *each organisation has quotas (video storage, code executions).*
+
+Quotas are two columns on `organizations` rather than a separate 1-to-1 table: there are only two numbers and they are always read with the organisation. Usage is computed from existing data (sum of `videos.size_bytes`, count of this month's `submissions`), so there is no counter to keep in sync.
+
+### 4.13 UUIDs instead of auto-increment ids
+
+- `/courses/42` invites trying `/courses/43`. A UUID cannot be guessed. Authorisation is still checked by Policies; this is an extra layer.
+- Laravel's `HasUuids` generates **ordered** UUIDs (v7), which start with a timestamp, so new rows are inserted at the end of the index like an auto-increment.
+- Internal high-volume tables (`transcript_segments`, `playback_events`) keep `bigint` ids: they never appear in URLs and are smaller to index.
 
 ## 5. Business rules → where they are enforced
 
-| Business rule (project brief) | Enforced by | Where |
-|---|---|---|
-| Must be logged in to comment, submit code or access private content | API auth middleware; `author_id` / `user_id` are `NOT NULL` foreign keys to `memberships` | Service + DB |
-| A course needs ≥ 1 lesson before publication | Trigger `courses_publishable`. Deleting the last lesson of a published course is refused by the API | DB + service |
-| A lesson can contain a video, text, an exercise, or a combination | Nullable `body_markdown`; `UNIQUE (lesson_id)` on `videos`, `exercises`, `quizzes` | DB |
-| A video is only visible once transcoding is finished | `CHECK (status <> 'ready' OR hls_master_key IS NOT NULL ...)`; API returns only `ready` videos | DB + service |
-| A lesson is locked until its prerequisites are validated | Unlock query over `lesson_prerequisites` and `lesson_progress`, checked by the API before serving a lesson | Service (query in `checks.sql`) |
-| Prerequisites cannot form a cycle | Trigger `lesson_prerequisites_acyclic` + `CHECK (lesson_id <> prerequisite_id)` | DB |
-| Submitted code only runs in an isolated sandbox | Only `run_code` jobs execute code, in the sandbox worker (#28); the API cannot read the queue | Infra + DB grants |
-| Comments follow moderation rules | `comment_status`, `comment_reports`, length `CHECK`; content filter in the API | DB + service |
-| Teachers only edit their own courses, unless admin | `courses.owner_id` + `memberships.role`, checked by the `requireCourseOwnerOrAdmin` guard | Service |
-| An organisation's data is never reachable from another one | `org_id` everywhere, composite foreign keys, row-level security (`FORCE`, fails closed) | DB |
-| Each organisation has quotas (video storage, code runs) | `org_quotas`; usage = `sum(videos.storage_bytes)` and submissions this month (index `(org_id, created_at)`); the API locks the `org_quotas` row while checking | DB + service |
-
-## 6. Main indexes
-
-| Index | Serves |
+| Business rule (project brief) | How, in Laravel |
 |---|---|
-| `users (lower(email))` unique | Login, case-insensitive unique emails |
-| `courses (org_id, status, category_id)` | Catalogue filtered by category |
-| `lessons (course_id, position)` unique | Ordered lesson list |
-| `transcript_segments USING gin (tsv)` | Full-text search |
-| `transcript_segments (video_id, start_ms)` | Transcript panel, WebVTT generation |
-| `comments (lesson_id, created_at)` | Comment list of a lesson |
-| `comments (lesson_id, timecode_ms) WHERE timecode_ms IS NOT NULL` | Markers on the player |
-| `submissions (exercise_id, user_id, created_at DESC)` | A student's submission history |
-| `submissions (org_id, created_at)` | Monthly code-run quota |
-| `submission_results (test_id) WHERE NOT passed` | Failure rate per test |
-| `playback_events (video_id, occurred_at)` | Retention aggregation |
-| `jobs (type, priority DESC, run_at) WHERE status = 'queued'` | Worker claim query |
+| Must be logged in to comment, submit code or access private content | `auth` middleware on the routes |
+| A course needs ≥ 1 lesson before publication | `PublishCourse` action checks `$course->lessons()->exists()` |
+| A lesson can contain a video, text, an exercise, or a combination | Nullable `lessons.content` + optional `hasOne` video / exercise / quiz (unique `lesson_id`) |
+| A video is only visible once transcoding is finished | `VideoStatus` enum, `Video::ready()` scope, `hls_path` set only by `TranscodeVideo` |
+| A lesson is locked until its prerequisites are validated | `LessonPolicy::view` checks prerequisites against `lesson_completions` |
+| Prerequisites cannot form a cycle | `PrerequisiteGraph` service, in a locked transaction, plus a unique `(lesson_id, prerequisite_id)` |
+| Submitted code only runs in an isolated sandbox | Only the `RunSubmission` job executes code, in an ephemeral Docker container (#28) |
+| Comments follow moderation rules | `StoreCommentRequest` validation + content filter, `status`, `comment_reports`, `SoftDeletes` |
+| Teachers only edit their own courses, unless admin | `CoursePolicy::update`: `owner_id` or admin role in `memberships` |
+| An organisation's data is never reachable from another one | `BelongsToOrganization` global scope, organisation middleware, scoped `exists` validation, feature tests |
+| Each organisation has quotas | Quota columns on `organizations`, checked before upload and before dispatching `RunSubmission` |
 
-## 7. Open points for team review
+## 6. Open points for the team
 
-- **PostgreSQL 18** is required for `uuidv7()`. On PostgreSQL 17 we would replace it with `gen_random_uuid()` (v4) or generate v7 in the application.
-- **Languages for exercises:** Python and JavaScript to start; adding one means `ALTER TYPE code_language ADD VALUE` and a runner image.
-- **One exercise per lesson:** OK for the V1, or do we want several?
-- **OAuth (bonus #47)** will add an `oauth_accounts(user_id, provider, provider_user_id)` table; `password_hash` is already nullable for it.
+- **PostgreSQL** rather than MySQL: needed for `fullText` with French stemming. OK for everyone?
+- **Exercise languages:** Python and JavaScript to start?
+- **One exercise per lesson** for V1: OK, or do we want several?
+- **OAuth (bonus #47):** would add an `oauth_accounts` table, or use Laravel Socialite with `provider` / `provider_id` columns on `users`.
