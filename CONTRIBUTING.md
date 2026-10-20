@@ -1,6 +1,6 @@
 # Contributing
 
-How the team (Lucas, Sorya, Leo) works on this project. The syllabus grades project management (agile + Git branch workflow), so please follow these rules.
+How the team (Lucas, Sorya, Yohan) works on this project. The syllabus grades project management (agile + Git branch workflow), so please follow these rules.
 
 ## Branches
 
