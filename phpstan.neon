@@ -1,0 +1,11 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - app
+        - routes
+        - database
+    # Run once to accept existing errors if needed, then raise the level progressively:
+    # ./vendor/bin/phpstan analyse --generate-baseline
