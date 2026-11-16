@@ -12,13 +12,16 @@ The whole stack (Livewire, Pest, Larastan, Docker images, CI) depends on the PHP
 2. **Previous Laravel major (more battle-tested).** Fewer surprises with third-party packages, but shorter remaining support.
 
 ## Decision
-We choose **option 1**: the latest stable Laravel major available at project start (`13.38.0`) and PHP `8.5.12`, the most recent version supported by Laravel **and** by all our required packages (Livewire, Larastan, Pest). Versions are checked against the official support table (laravel.com/docs/releases) before freezing.
+We choose **option 1**: the latest stable Laravel major available at project start (13.x) and PHP 8.5, the most recent version supported by Laravel **and** by all our required packages (Livewire, Larastan, Pest). Versions were checked against the official support table (laravel.com/docs/releases) before freezing.
+
+The ADR records the policy, not patch numbers: the exact installed Laravel version is whatever `composer.lock` says (13.39.0 when this ADR was written).
 
 Pinning is enforced in every layer:
-- `composer.json`: `"require"` and `"config": { "platform": { "php": "8.5.12" } }`; `composer.lock` is committed.
-- Docker: image tag pinned to the minor version, never `latest`.
-- Node (for Vite): LTS version pinned in `.nvmrc` and in the build stage of the Dockerfile.
-- CI uses the same versions as the Dockerfile.
+- **Laravel:** `composer.json` allows `^13.17`; `composer.lock` is committed.
+- **PHP:** `composer.json` requires `~8.5.0` (any 8.5.x), and `config.platform.php` is set to `8.5.12`, the lowest patch we guarantee, so Composer resolves the same dependencies everywhere.
+- **Docker:** the PHP image is pinned to the minor version (`php:8.5-fpm-alpine`), never `latest`; patch updates arrive when the image is rebuilt.
+- **Node (for Vite):** the LTS major is written in `.nvmrc` and reused in the build stage of the Dockerfile and in CI.
+- All version changes go in one commit that updates `composer.json`, `.nvmrc`, the Dockerfile and CI together.
 
 ## Consequences
 - **Positive:** reproducible builds, identical dev/CI/prod behaviour, up-to-date documentation.

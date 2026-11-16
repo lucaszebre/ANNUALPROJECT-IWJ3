@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-21
-- **Deciders:** Lucas, Pauline et Yohan
+- **Deciders:** Lucas, Pauline and Yohan
 
 ## Context
 With several contributors and a Git-flow based workflow, we need automated checks on every pull request: tests, consistent code style, and static analysis. Security and code quality are part of the grading.
