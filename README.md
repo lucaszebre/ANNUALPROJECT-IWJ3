@@ -59,7 +59,7 @@ The platform brings these uses together around three pillars:
 | Layer | Choice |
 |---|---|
 | Backend | **Laravel** (PHP) |
-| Frontend | Blade templates + **Livewire** and Alpine.js, built with Vite (no React, Vue or Angular, per the syllabus) |
+| Frontend | Blade templates + **Livewire** and Alpine.js, styled with **Tailwind CSS**, built with Vite (no React, Vue or Angular, per the syllabus) |
 | Database | **PostgreSQL**: application data, the job queue and full-text search |
 | Background jobs | Laravel queues with the `database` driver, one worker per queue |
 | File storage | MinIO (S3-compatible) through Laravel's `s3` disk |
@@ -68,18 +68,19 @@ The platform brings these uses together around three pillars:
 | Code sandbox | Ephemeral Docker containers with no network and CPU/memory/time/process limits |
 | Reverse proxy | Caddy (automatic HTTPS) |
 | Infrastructure | Docker + `compose.yml`, on a 5-10 €/month VPS. No paid services. |
+| Quality | Pest (tests), Laravel Pint (code style), Larastan (static analysis), run in CI |
 
 The detailed decisions are recorded in `docs/adr/` (#3).
 
 ## Architecture
 
-Transcoding, transcription and code execution are three kinds of jobs on **a single queue**. One architecture, three features.
+Transcoding, transcription and code execution are three kinds of jobs in **a single queue system**: one `jobs` table in PostgreSQL, with a named queue for each kind of job. One architecture, three features.
 
 ```mermaid
 flowchart TB
     browser([Browser]) -->|HTTPS| caddy[Caddy]
     caddy --> app[Laravel app<br/>Blade + Livewire]
-    app -->|dispatch| queue[[jobs table<br/>one queue, three job types]]
+    app -->|dispatch| queue[[jobs table<br/>three named queues]]
     queue --> transcode & transcribe & sandbox
     subgraph workers [Queue workers]
         direction LR
@@ -101,7 +102,7 @@ flowchart TB
 
 - The app saves a row (a video, a submission) and dispatches its job in the same transaction.
 - Workers take jobs with `SELECT ... FOR UPDATE SKIP LOCKED`, so two workers never take the same job.
-- Each kind of job has its own queue and worker. A long transcription never delays a student waiting for their code result.
+- Each named queue has its own worker. A long transcription never delays a student waiting for their code result.
 - The interface shows the status stored on the row (`videos.status`, `submissions.status`), refreshed with Livewire polling (the syllabus does not allow WebSockets).
 
 ## Data model
