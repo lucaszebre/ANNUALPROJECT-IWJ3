@@ -29,7 +29,7 @@ Examples: `feature/20-job-queue`, `fix/57-hls-safari`, `hotfix/63-login-500`.
 3. Commit often using [Conventional Commits](#commit-messages).
 4. Push and open a pull request into `develop`. Fill in the template and write `Closes #<issue>`. Move the card to **In Review**.
 5. Another member reviews. Address comments, then the author merges with **Squash and merge**. The branch is deleted automatically and the issue closes.
-6. Keep your branch up to date with `git pull --rebase origin develop` rather than merging `develop` into it.
+6. Keep your branch up to date with `git pull --rebase origin develop` rather than merging `develop` into it. A rebase rewrites your commits, so push with `git push --force-with-lease`: it refuses to overwrite commits someone else pushed to your branch.
 
 ## Releases
 
@@ -58,12 +58,12 @@ Format: `<type>(<optional scope>): <short summary in the imperative>`
 | `ci` | CI pipeline |
 | `build` | Docker, build system |
 
-Scopes follow the app areas: `api`, `worker`, `web`, `db`, `sandbox`, `infra`, `docs`.
+Scopes follow the app areas: `auth`, `courses`, `video`, `sandbox`, `analytics`, `ui`, `db`, `queue`, `infra`. Leave the scope out when the change has no single area.
 
 Examples:
 ```
-feat(worker): add ffmpeg HLS transcoding job
-fix(api): reject prerequisite edges that create a cycle
+feat(video): add ffmpeg HLS transcoding job
+fix(courses): reject prerequisite edges that create a cycle
 docs: add data model justification
 ```
 
