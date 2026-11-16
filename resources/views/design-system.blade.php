@@ -67,7 +67,45 @@
         </section>
 
         <section class="flex flex-col gap-6">
-            <h2 class="text-title-sm">05 Couleurs fonctionnelles</h2>
+            <h2 class="text-title-sm">05 Champs complémentaires</h2>
+            <div class="grid max-w-[1160px] gap-6 lg:grid-cols-2">
+                <x-select name="ds_level" label="Niveau" placeholder="Choisir un niveau" :options="['beginner' => 'Débutant', 'intermediate' => 'Intermédiaire']" />
+                <x-textarea name="ds_question" label="Votre question" placeholder="Décrivez le passage qui bloque…" hint="Visible par l’enseignant du cours." />
+            </div>
+        </section>
+
+        <section class="flex flex-col gap-6">
+            <h2 class="text-title-sm">06 Messages et états</h2>
+            <div class="grid max-w-[1160px] gap-4 lg:grid-cols-2">
+                <x-alert type="info" title="Information">La vidéo est en cours de traitement.</x-alert>
+                <x-alert type="success" title="Réussi">Tous les tests passent.</x-alert>
+                <x-alert type="warning" title="Attention">Il vous reste 2 tentatives.</x-alert>
+                <x-alert type="error" title="Erreur">La soumission a échoué.</x-alert>
+            </div>
+            <div class="grid max-w-[1160px] gap-6 lg:grid-cols-2">
+                <x-card title="Carte">
+                    <p class="text-sm text-muted">Surface blanche, rayon 12 px, bordure Line.</p>
+                </x-card>
+                <x-empty-state title="Aucun cours pour l’instant">
+                    Les cours publiés apparaîtront ici.
+                </x-empty-state>
+            </div>
+            {{-- x-data: Alpine only runs x-on inside a component. --}}
+            <div x-data class="flex flex-wrap gap-4">
+                <x-button type="button" variant="secondary" x-on:click="$dispatch('open-modal', 'ds-modal')">Ouvrir la modale</x-button>
+                <x-button type="button" variant="secondary" x-on:click="$dispatch('toast', { type: 'success', message: 'Cours enregistré.' })">Afficher un toast</x-button>
+            </div>
+            <x-modal name="ds-modal" title="Supprimer la leçon ?">
+                La leçon et ses commentaires seront supprimés.
+                <x-slot:footer>
+                    <x-button type="button" variant="ghost" x-on:click="$dispatch('close-modal', 'ds-modal')">Annuler</x-button>
+                    <x-button type="button">Supprimer</x-button>
+                </x-slot:footer>
+            </x-modal>
+        </section>
+
+        <section class="flex flex-col gap-6">
+            <h2 class="text-title-sm">07 Couleurs fonctionnelles</h2>
             <div class="grid grid-cols-2 gap-6 sm:grid-cols-4 lg:grid-cols-7">
                 @foreach ($functional as $name => $hex)
                     <div>
