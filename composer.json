@@ -1,14 +1,15 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "iw3/annualproject-iwj3",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Annual Project - E-learning SaaS Platform.",
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
-        "php": "8.5.12",
+        "php": "~8.5.0",
         "laravel/framework": "^13.17",
         "laravel/tinker": "^3.0",
+        "league/flysystem-aws-s3-v3": "3.0",
         "livewire/livewire": "^4.4"
     },
     "require-dev": {
@@ -60,11 +61,6 @@
         ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
-        ],
-        "post-create-project-cmd": [
-            "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
-            "@php artisan migrate --graceful --ansi"
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
