@@ -2,7 +2,7 @@
 
 The database of the code learning platform, drawn before implementation, with the reasons behind each abstraction. This is the document we defend at the final presentation (syllabus › Modélisation). The tables will be implemented later as Laravel migrations and Eloquent models.
 
-Target: **Laravel 12+** with **PostgreSQL** (needed for full-text search with French stemming).
+Target: **Laravel 13** (ADR-0001) with **PostgreSQL** (ADR-0005, needed for full-text search with French stemming).
 
 ## 1. Conventions
 
@@ -46,7 +46,10 @@ A draft course can be empty, but a course needs at least one lesson to be **publ
 
 ## 3. Detailed diagrams
 
-Every tenant table has an `organization_id` column (see [decision 4.1](#41-organisations-one-database-shared-by-all-organisations)); it is shown only where it matters.
+Every table with a model we query directly has an `organization_id` column, so the global scope of [decision 4.1](#41-organisations-one-database-shared-by-all-organisations) can filter it:
+
+- **With `organization_id`:** `categories`, `courses`, `lessons`, `videos`, `transcript_segments`, `comments`, `comment_reports`, `exercises`, `submissions`, `quizzes`, `quiz_attempts`, `playback_events`.
+- **Without it:** child rows only read through their parent (`exercise_tests`, `submission_results`, `quiz_questions`, `quiz_choices`, `quiz_attempt_choice`), and tables only reached from a scoped model (`lesson_prerequisites`, `enrollments`, `lesson_completions`, `video_retention_stats`).
 
 ### 3.1 Organisations and users
 
@@ -145,7 +148,9 @@ erDiagram
         uuid video_id FK
         int start_ms
         int end_ms
-        text text "fullText index (french)"
+        text text
+        regconfig search_config "fr_unaccent | en_unaccent, from the video language"
+        tsvector search_vector "generated from text, GIN index"
     }
     comments {
         uuid id PK
@@ -160,6 +165,7 @@ erDiagram
     }
     comment_reports {
         uuid id PK
+        uuid organization_id FK "admins list the reports of their organisation"
         uuid comment_id FK
         uuid user_id FK "unique with comment_id"
         string reason
@@ -185,6 +191,7 @@ erDiagram
     quiz_attempts }o--o{ quiz_choices : "quiz_attempt_choice"
     exercises {
         uuid id PK
+        uuid organization_id FK
         uuid lesson_id FK "unique"
         string language "CodeLanguage: python | javascript"
         text statement "Markdown"
@@ -204,6 +211,7 @@ erDiagram
     }
     submissions {
         uuid id PK
+        uuid organization_id FK "index with created_at, for the quota"
         uuid exercise_id FK
         uuid user_id FK
         text code
@@ -224,6 +232,7 @@ erDiagram
     }
     quizzes {
         uuid id PK
+        uuid organization_id FK
         uuid lesson_id FK "unique"
         int pass_threshold_percent
     }
@@ -242,6 +251,7 @@ erDiagram
     }
     quiz_attempts {
         uuid id PK
+        uuid organization_id FK
         uuid quiz_id FK
         uuid user_id FK
         int score_percent
@@ -370,26 +380,49 @@ Rule: *a lesson can contain a video, text, an exercise, or a combination of the 
 
 The 1-to-1 is enforced with a unique index on `lesson_id`. If we later want several exercises per lesson, we only remove that unique index and change `hasOne` to `hasMany`.
 
+Lessons are ordered by `position`, unique per course. PostgreSQL checks a normal unique constraint row by row, so moving a lesson with `UPDATE lessons SET position = position + 1 ...` can fail halfway on a duplicate. The constraint is therefore created as `DEFERRABLE INITIALLY DEFERRED` (raw SQL in the migration): it is checked once, at the end of the reordering transaction. `exercise_tests` and `quiz_questions` use the same constraint on their `position`.
+
 ### 4.4 Videos: a status, and paths instead of files
 
 Rule: *a video is only visible once its transcoding is finished.*
 
 - `status` follows `uploaded → processing → ready | failed`. A local scope `Video::ready()` is used for everything students see, and `hls_path` is only set when the transcode job succeeds.
-- The database stores **paths** on the MinIO disk, never URLs or files. The application generates temporary signed URLs (`Storage::temporaryUrl()`), so videos are never public and the storage can move without a data migration.
+- The database stores **paths** on the MinIO disk, never URLs or files, so the storage can move without a data migration. Videos are never public. `Storage::temporaryUrl()` signs one file, but an HLS playlist points to its segments by relative path, and each segment needs its own signature. How segments are served (through the app, or by rewriting the playlist with signed URLs) is decided in ADR-0007.
 - `size_bytes` feeds the video storage quota: `Video::sum('size_bytes')` for the organisation.
 
 ### 4.5 Transcripts: segments, not one big text
 
 Whisper returns timed segments. We keep them as rows (`start_ms`, `end_ms`, `text`) instead of one text per video because that is what makes search "precise to the second": each search hit is a segment, so we can open the video at `start_ms`. The same rows produce the subtitle file (WebVTT).
 
-Search uses PostgreSQL full text, natively supported by Laravel, instead of a search engine like Meilisearch or Elasticsearch:
+Search uses PostgreSQL full text instead of a search engine like Meilisearch or Elasticsearch. One less service to run on the VPS. Two details need care:
 
-```php
-$table->fullText('text')->language('french');                    // migration: GIN index
-TranscriptSegment::whereFullText('text', $q, ['language' => 'french'])->get(); // query
+- **Language.** A video is in French or English (`videos.language`), and stemming depends on the language. Each segment stores the text search configuration of its video (`search_config`), and a generated column computes `to_tsvector(search_config, text)`.
+- **Accents.** Stemming alone does not remove accents, so "recursive" would not find "récursive". We create two configurations, `fr_unaccent` and `en_unaccent`, that run `unaccent` before the stemmer. `unaccent` cannot be used directly in a generated column or an index because PostgreSQL does not consider it immutable, but a text search configuration that uses it can.
+
+The schema builder cannot express this, so the migration uses raw SQL:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE TEXT SEARCH CONFIGURATION fr_unaccent (COPY = french);
+ALTER TEXT SEARCH CONFIGURATION fr_unaccent
+    ALTER MAPPING FOR hword, hword_part, word WITH unaccent, french_stem;
+-- same for en_unaccent, with english_stem
+
+ALTER TABLE transcript_segments ADD COLUMN search_vector tsvector
+    GENERATED ALWAYS AS (to_tsvector(search_config, text)) STORED;
+CREATE INDEX transcript_segments_search_vector ON transcript_segments USING gin (search_vector);
 ```
 
-French stemming means "fonctions récursives" also finds "une fonction récursive". One less service to run on the VPS.
+The query matches the search in both languages, with constant configurations so that PostgreSQL can use the index:
+
+```php
+TranscriptSegment::whereRaw(
+    "search_vector @@ (websearch_to_tsquery('fr_unaccent', ?) || websearch_to_tsquery('en_unaccent', ?))",
+    [$q, $q],
+)->get();
+```
+
+"fonctions récursives" then finds "une fonction récursive", and also "fonction recursive" typed without accents.
 
 ### 4.6 Comments: one table for questions, answers and timecoded comments
 
@@ -418,7 +451,7 @@ public function prerequisites(): BelongsToMany
 }
 ```
 
-This allows a real graph (a lesson can require two others), not only a linear order. Before saving an edge, a `PrerequisiteGraph` service walks the existing prerequisites and refuses the edge if it would close a loop. It runs in a transaction that locks the course, so two teachers cannot each create half of a cycle at the same time.
+This allows a real graph (a lesson can require two others), not only a linear order. Both lessons belong to the same course: the service refuses a prerequisite from another course, and a `CHECK (lesson_id <> prerequisite_id)` constraint refuses a lesson that requires itself. Before saving an edge, a `PrerequisiteGraph` service walks the existing prerequisites and refuses the edge if it would close a loop. It runs in a transaction that locks the course, so two teachers cannot each create half of a cycle at the same time.
 
 A lesson is **unlocked** when all of its prerequisites appear in the student's `lesson_completions`. This is computed, not stored.
 
@@ -434,9 +467,9 @@ A row in `lesson_completions` means "this user completed this lesson", with its 
 - Computing the drop-off curve from raw events on every dashboard load would be slow, so a scheduled job aggregates it into `video_retention_stats` (viewers still watching per 10-second bucket).
 - The failure rate per exercise is computed directly from `submissions` and `submission_results`, which are small enough.
 
-### 4.11 Background jobs: one queue, three kinds of work
+### 4.11 Background jobs: one queue table, three kinds of work
 
-The central argument of the project: transcoding, transcription and code execution are three kinds of jobs on **one** queue.
+The central argument of the project: transcoding, transcription and code execution are three kinds of jobs in **one** queue system, the `jobs` table, each with its own named queue.
 
 We use Laravel's **database queue driver**: one `jobs` table in PostgreSQL, no Redis or RabbitMQ. Workers take jobs with `SELECT ... FOR UPDATE SKIP LOCKED`, so several workers never take the same job.
 
@@ -447,7 +480,7 @@ We use Laravel's **database queue driver**: one `jobs` table in PostgreSQL, no R
 | `RunSubmission` (Docker sandbox) | `sandbox` | `submissions.status`, `submission_results` |
 | `AggregateVideoRetention` (scheduled) | `default` | `video_retention_stats` |
 
-Separate queue names let us run dedicated workers (`queue:work --queue=sandbox`): a long Whisper transcription never delays a student waiting for their code result. The UI never reads the `jobs` table. It shows the status of the domain row (`videos.status`, `submissions.status`), which the job updates.
+Separate queue names let us run dedicated workers (`queue:work --queue=sandbox`): a long Whisper transcription never delays a student waiting for their code result. The queue's `retry_after` is set longer than the slowest job (a transcription can take tens of minutes); otherwise the queue would think the job had died and start it a second time while the first run is still going. The UI never reads the `jobs` table. It shows the status of the domain row (`videos.status`, `submissions.status`), which the job updates.
 
 ### 4.12 Quotas: two columns on `organizations`
 
@@ -470,7 +503,7 @@ Quotas are two columns on `organizations` rather than a separate 1-to-1 table: t
 | A lesson can contain a video, text, an exercise, or a combination | Nullable `lessons.content` + optional `hasOne` video / exercise / quiz (unique `lesson_id`) |
 | A video is only visible once transcoding is finished | `VideoStatus` enum, `Video::ready()` scope, `hls_path` set only by `TranscodeVideo` |
 | A lesson is locked until its prerequisites are validated | `LessonPolicy::view` checks prerequisites against `lesson_completions` |
-| Prerequisites cannot form a cycle | `PrerequisiteGraph` service, in a locked transaction, plus a unique `(lesson_id, prerequisite_id)` |
+| Prerequisites cannot form a cycle | `PrerequisiteGraph` service, in a locked transaction, plus a unique `(lesson_id, prerequisite_id)` and a `CHECK (lesson_id <> prerequisite_id)` |
 | Submitted code only runs in an isolated sandbox | Only the `RunSubmission` job executes code, in an ephemeral Docker container (#28) |
 | Comments follow moderation rules | `StoreCommentRequest` validation + content filter, `status`, `comment_reports`, `SoftDeletes` |
 | Teachers only edit their own courses, unless admin | `CoursePolicy::update`: `owner_id` or admin role in `memberships` |
@@ -479,7 +512,6 @@ Quotas are two columns on `organizations` rather than a separate 1-to-1 table: t
 
 ## 6. Open points for the team
 
-- **PostgreSQL** rather than MySQL: needed for `fullText` with French stemming. OK for everyone?
 - **Exercise languages:** Python and JavaScript to start?
 - **One exercise per lesson** for V1: OK, or do we want several?
 - **OAuth (bonus #47):** would add an `oauth_accounts` table, or use Laravel Socialite with `provider` / `provider_id` columns on `users`.
