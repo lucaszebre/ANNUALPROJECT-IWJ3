@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\LessonVideoUploadController;
 use App\Http\Controllers\OrganizationSelectionController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +23,13 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware('organization.selected')->group(function (): void {
         Route::view('/dashboard', 'dashboard')->name('dashboard');
     });
+});
+
+Route::middleware('auth')->group(function () {
+    Route::post('/lessons/{lesson}/video/upload-url', [LessonVideoUploadController::class, 'create'])
+        ->name('lessons.video.upload-url');
+    Route::post('/lessons/{lesson}/video', [LessonVideoUploadController::class, 'store'])
+        ->name('lessons.video.store');
 });
 
 // Local and tests only: the design system, to compare the components with Figma.
