@@ -74,6 +74,12 @@ Rules for comments:
 - An administrator can moderate all courses, users, and comments.
 - Private data and secrets must never be exposed in the source code.
 
+## Design: Wireframes and Mockups
+
+The user interface and main user journeys were designed using wireframes.
+
+[View the wireframes on Figma](https://www.figma.com/design/xLC0P3Rt3pnTn2OAXl2n8I/Projet-Annuel?node-id=0-1&t=TwCPBx1rBKPEVUrB-1)
+
 ## Technical Requirements From The Syllabus
 
 The project must respect the annual project constraints:
