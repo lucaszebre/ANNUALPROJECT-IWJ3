@@ -1,0 +1,161 @@
+# Local development stack: `docker compose up`
+# Production images come from the `app` and `web` targets of the Dockerfile.
+# No secrets here: every value comes from `.env` (copy .env.example).
+
+x-php-service: &php-service
+  image: app-dev
+  pull_policy: never
+  working_dir: /var/www/html
+  volumes:
+    - .:/var/www/html
+    - vendor:/var/www/html/vendor # keeps dependencies off the (slow) host bind mount
+  environment: &php-env
+    # Inside Docker the services are reached by name, not 127.0.0.1.
+    DB_HOST: postgres
+    DB_PORT: "5432"
+    AWS_ENDPOINT: http://minio:9000
+    MAIL_MAILER: smtp
+    MAIL_HOST: mailpit
+    MAIL_PORT: "1025"
+
+services:
+  app:
+    <<: *php-service
+    build:
+      context: .
+      target: dev
+      args:
+        PHP_VERSION: ${PHP_VERSION:-8.5}
+    environment:
+      <<: *php-env
+      PREPARE_PROJECT: "true" # only this container runs composer install / key:generate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 180s # first start runs composer install
+    restart: unless-stopped
+
+  web:
+    image: caddy:${CADDY_VERSION:-2.10}-alpine
+    ports:
+        - "${APP_PORT:-8000}:80"
+    volumes:
+        - ./public:/var/www/html/public:ro
+        - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+        - caddy-data:/data
+        - caddy-config:/config
+    depends_on:
+        app:
+            condition: service_healthy
+    healthcheck:
+        test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/up"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+    restart: unless-stopped
+
+  queue:
+    <<: *php-service
+    user: www-data
+    command: ["php", "artisan", "queue:work", "--queue=default", "--tries=3", "--sleep=3", "--max-time=3600"]
+    depends_on:
+      app:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  scheduler:
+    <<: *php-service
+    user: www-data
+    command: ["php", "artisan", "schedule:work"]
+    depends_on:
+      app:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  vite:
+    image: node:${NODE_VERSION:-24}-alpine
+    working_dir: /var/www/html
+    command: ["sh", "-c", "npm ci && npm run dev -- --host 0.0.0.0"]
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - .:/var/www/html
+      - node_modules:/var/www/html/node_modules # Linux binaries, kept apart from the host's
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:?Set DB_DATABASE in .env}
+      POSTGRES_USER: ${DB_USERNAME:?Set DB_USERNAME in .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro # creates app_testing on first start
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    # Check that this image still pulls (see ADR-0007); override with MINIO_IMAGE in .env.
+    image: ${MINIO_IMAGE:-pgsty/silo:RELEASE.2026-11-12T00-00-00Z}
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in .env}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in .env}
+    ports:
+      - "127.0.0.1:9000:9000" # S3 API
+      - "127.0.0.1:9001:9001" # web console
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  minio-init:
+    image: ${MC_IMAGE:-pgsty/mc:RELEASE.2026-11-12T00-00-00Z}
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_BUCKET: ${AWS_BUCKET:?Set AWS_BUCKET in .env}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        mc alias set local http://minio:9000 "$${AWS_ACCESS_KEY_ID}" "$${AWS_SECRET_ACCESS_KEY}" &&
+        mc mb --ignore-existing "local/$${AWS_BUCKET}"
+    restart: "no"
+
+  mailpit:
+    image: axllent/mailpit:v1.33 # dev-only tool: pin a tag once it works for you
+    ports:
+      - "127.0.0.1:8025:8025" # web UI (SMTP is 1025, internal)
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  minio-data:
+  vendor:
+  node_modules:
+  caddy-data:
+  caddy-config:
