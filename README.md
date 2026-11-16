@@ -81,11 +81,11 @@ flowchart TB
     browser([Browser]) -->|HTTPS| caddy[Caddy]
     caddy --> app[Laravel app<br/>Blade + Livewire]
     app -->|dispatch| queue[[jobs table<br/>three named queues]]
-    queue --> transcode & transcribe & sandbox
+    queue --> transcoding & transcription & sandbox
     subgraph workers [Queue workers]
         direction LR
-        transcode[transcode<br/>ffmpeg → HLS]
-        transcribe[transcribe<br/>Whisper]
+        transcoding[transcoding<br/>ffmpeg → HLS]
+        transcription[transcription<br/>Whisper]
         sandbox[sandbox<br/>run student code]
     end
     sandbox -->|docker socket proxy| runner[Ephemeral container<br/>no network, CPU/RAM/time limits]

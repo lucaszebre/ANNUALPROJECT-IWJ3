@@ -149,7 +149,7 @@ erDiagram
         int start_ms
         int end_ms
         text text
-        regconfig search_config "fr_unaccent | en_unaccent, from the video language"
+        regconfig search_config "french_unaccent | english_unaccent, from the video language"
         tsvector search_vector "generated from text, GIN index"
     }
     comments {
@@ -310,7 +310,7 @@ erDiagram
     }
     jobs {
         bigint id PK "Laravel database queue"
-        string queue "transcode | transcribe | sandbox | default"
+        string queue "transcoding | transcription | sandbox | default"
         text payload "serialized Job class"
         int attempts
         int reserved_at
@@ -397,16 +397,16 @@ Whisper returns timed segments. We keep them as rows (`start_ms`, `end_ms`, `tex
 Search uses PostgreSQL full text instead of a search engine like Meilisearch or Elasticsearch. One less service to run on the VPS. Two details need care:
 
 - **Language.** A video is in French or English (`videos.language`), and stemming depends on the language. Each segment stores the text search configuration of its video (`search_config`), and a generated column computes `to_tsvector(search_config, text)`.
-- **Accents.** Stemming alone does not remove accents, so "recursive" would not find "récursive". We create two configurations, `fr_unaccent` and `en_unaccent`, that run `unaccent` before the stemmer. `unaccent` cannot be used directly in a generated column or an index because PostgreSQL does not consider it immutable, but a text search configuration that uses it can.
+- **Accents.** Stemming alone does not remove accents, so "recursive" would not find "récursive". We create two configurations, `french_unaccent` and `english_unaccent` (ADR-0005), that run `unaccent` before the stemmer. `unaccent` cannot be used directly in a generated column or an index because PostgreSQL does not consider it immutable, but a text search configuration that uses it can.
 
 The schema builder cannot express this, so the migration uses raw SQL:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS unaccent;
-CREATE TEXT SEARCH CONFIGURATION fr_unaccent (COPY = french);
-ALTER TEXT SEARCH CONFIGURATION fr_unaccent
+CREATE TEXT SEARCH CONFIGURATION french_unaccent (COPY = french);
+ALTER TEXT SEARCH CONFIGURATION french_unaccent
     ALTER MAPPING FOR hword, hword_part, word WITH unaccent, french_stem;
--- same for en_unaccent, with english_stem
+-- same for english_unaccent, with english_stem
 
 ALTER TABLE transcript_segments ADD COLUMN search_vector tsvector
     GENERATED ALWAYS AS (to_tsvector(search_config, text)) STORED;
@@ -417,7 +417,7 @@ The query matches the search in both languages, with constant configurations so 
 
 ```php
 TranscriptSegment::whereRaw(
-    "search_vector @@ (websearch_to_tsquery('fr_unaccent', ?) || websearch_to_tsquery('en_unaccent', ?))",
+    "search_vector @@ (websearch_to_tsquery('french_unaccent', ?) || websearch_to_tsquery('english_unaccent', ?))",
     [$q, $q],
 )->get();
 ```
@@ -473,14 +473,14 @@ The central argument of the project: transcoding, transcription and code executi
 
 We use Laravel's **database queue driver**: one `jobs` table in PostgreSQL, no Redis or RabbitMQ. Workers take jobs with `SELECT ... FOR UPDATE SKIP LOCKED`, so several workers never take the same job.
 
-| Job class | Queue | Updates |
-|---|---|---|
-| `TranscodeVideo` (ffmpeg → HLS) | `transcode` | `videos.status`, then dispatches `TranscribeVideo` |
-| `TranscribeVideo` (Whisper) | `transcribe` | `videos.transcript_status`, `transcript_segments` |
-| `RunSubmission` (Docker sandbox) | `sandbox` | `submissions.status`, `submission_results` |
-| `AggregateVideoRetention` (scheduled) | `default` | `video_retention_stats` |
+| Job class | Queue | Connection | Updates |
+|---|---|---|---|
+| `TranscodeVideo` (ffmpeg → HLS) | `transcoding` | `database_long` | `videos.status`, then dispatches `TranscribeVideo` |
+| `TranscribeVideo` (Whisper) | `transcription` | `database_long` | `videos.transcript_status`, `transcript_segments` |
+| `RunSubmission` (Docker sandbox) | `sandbox` | `database` | `submissions.status`, `submission_results` |
+| `AggregateVideoRetention` (scheduled) | `default` | `database` | `video_retention_stats` |
 
-Separate queue names let us run dedicated workers (`queue:work --queue=sandbox`): a long Whisper transcription never delays a student waiting for their code result. The queue's `retry_after` is set longer than the slowest job (a transcription can take tens of minutes); otherwise the queue would think the job had died and start it a second time while the first run is still going. The UI never reads the `jobs` table. It shows the status of the domain row (`videos.status`, `submissions.status`), which the job updates.
+Separate queue names let us run dedicated workers (`queue:work database --queue=sandbox`): a long Whisper transcription never delays a student waiting for their code result. `retry_after` must be longer than the slowest job (a transcription can take tens of minutes); otherwise the queue would think the job had died and start it a second time while the first run is still going. `retry_after` belongs to a queue connection, so the long jobs use a second connection, `database_long`, on the same `jobs` table (ADR-0006). The UI never reads the `jobs` table. It shows the status of the domain row (`videos.status`, `submissions.status`), which the job updates.
 
 ### 4.12 Quotas: two columns on `organizations`
 
