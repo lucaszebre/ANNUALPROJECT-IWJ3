@@ -1,0 +1,38 @@
+name: Task / feature
+description: A unit of work for the backlog
+labels: []
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why this is needed. Link the business rule or syllabus section if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How we know it's done.
+      value: |
+        -
+    validations:
+      required: true
+  - type: input
+    id: reference
+    attributes:
+      label: Reference
+      placeholder: "Syllabus › Intégration Web · PDF › Axe C"
+  - type: input
+    id: depends
+    attributes:
+      label: Depends on
+      placeholder: "#12, #20"
