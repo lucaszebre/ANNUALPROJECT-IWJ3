@@ -51,24 +51,27 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $variables = Lesson::factory()->for($course)->create([
+            'position' => 1,
             'title' => 'Variables et types',
             'content' => "Une **variable** associe un nom à une valeur.\n\n```python\nage = 20\nnom = \"Ada\"\n```",
         ]);
 
         $functions = Lesson::factory()->for($course)->create([
+            'position' => 2,
             'title' => 'Les fonctions',
             'content' => "Une **fonction** regroupe des instructions réutilisables.\n\n```python\ndef carre(x):\n    return x * x\n```",
         ]);
         $this->sumExercise($functions);
 
         $quizLesson = Lesson::factory()->for($course)->create([
+            'position' => 3,
             'title' => 'Quiz : les bases',
             'content' => null,
         ]);
         $this->basicsQuiz($quizLesson);
 
-        $functions->prerequisites()->attach($variables);
-        $quizLesson->prerequisites()->attach($functions);
+        $functions->prerequisites()->attach($variables->getKey());
+        $quizLesson->prerequisites()->attach($functions->getKey());
 
         $draft = Course::factory()->for($organization)->create([
             'owner_id' => $teacher->id,
@@ -77,6 +80,7 @@ class DatabaseSeeder extends Seeder
             'slug' => 'introduction-au-html',
         ]);
         Lesson::factory()->for($draft)->create([
+            'position' => 1,
             'title' => 'Structure d\'une page',
         ]);
 
