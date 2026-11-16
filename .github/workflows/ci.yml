@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality, tests and image
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: app_testing
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U app -d app_testing"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      APP_ENV: testing
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: app_testing
+      DB_USERNAME: app
+      DB_PASSWORD: app
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: bcmath, mbstring, pdo_pgsql, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Install PHP dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Prepare Laravel
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+          php artisan migrate --seed --force
+
+      - name: Check code style
+        run: composer lint
+
+      - name: Run static analysis
+        run: composer analyse
+
+      - name: Run tests
+        run: composer test
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build Docker image
+        run: docker build --tag annualproject-iwj3:${{ github.sha }} .
+
+      - name: Smoke test Docker image
+        run: |
+          docker run --detach --name annualproject-ci \
+            --publish 8000:8000 \
+            annualproject-iwj3:${{ github.sha }}
+          trap 'docker rm --force annualproject-ci' EXIT
+
+          for attempt in {1..10}; do
+            if curl --fail --silent http://127.0.0.1:8000/up; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs annualproject-ci
+          exit 1
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan repository with Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
