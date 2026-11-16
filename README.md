@@ -76,9 +76,11 @@ Rules for comments:
 
 ## Design: Wireframes and Mockups
 
-The user interface and main user journeys were designed using wireframes.
+The user interface and main user journeys were designed using wireframes and mockups.
 
-[View the wireframes on Figma](https://www.figma.com/design/xLC0P3Rt3pnTn2OAXl2n8I/Projet-Annuel?node-id=0-1&t=TwCPBx1rBKPEVUrB-1)
+- [View the wireframes on Figma](https://www.figma.com/design/xLC0P3Rt3pnTn2OAXl2n8I/Projet-Annuel?node-id=0-1&t=TwCPBx1rBKPEVUrB-1)
+- [View the mockups on Figma](https://www.figma.com/design/xLC0P3Rt3pnTn2OAXl2n8I/Projet-Annuel?node-id=19-2&t=ofacA7ZuV4obei40-1)
+- [View the design system on Figma](https://www.figma.com/design/xLC0P3Rt3pnTn2OAXl2n8I/Projet-Annuel?node-id=41-154&t=NRwgs3noAcNAJRJ8-1)
 
 ## Technical Requirements From The Syllabus
 
