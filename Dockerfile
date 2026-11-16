@@ -1,7 +1,7 @@
 FROM php:8.5-cli-bookworm AS php-base
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libpq-dev libzip-dev unzip \
+    && apt-get install -y --no-install-recommends libonig-dev libpq-dev libzip-dev unzip \
     && docker-php-ext-install bcmath mbstring pdo_pgsql zip \
     && rm -rf /var/lib/apt/lists/*
 
@@ -18,7 +18,8 @@ RUN composer install \
     --no-progress \
     --no-interaction
 COPY . .
-RUN composer dump-autoload --no-dev --optimize --no-interaction \
+RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views bootstrap/cache \
+    && composer dump-autoload --no-dev --optimize --no-interaction \
     && php artisan package:discover --ansi
 
 FROM node:24-bookworm-slim AS assets

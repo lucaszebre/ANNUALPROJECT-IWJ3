@@ -51,7 +51,12 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $variables = Lesson::factory()->for($course)->create([
-            'position' => 1,
+The **“Build Docker image”** step failed; the smoke test was skipped. PostgreSQL reported application data/constraint errors:
+
+- `duplicate key value violates unique constraint "lessons_course_id_position_unique"`
+- `lesson_prerequisites_not_self` rejected a lesson referencing itself.
+
+This is a **code/fixture/database-seeding problem**, not a flaky GitHub Actions runner issue. Fix the seed/migration data to avoid duplicate lesson positions and self-referencing prerequisites, then rerun the build.            'position' => 1,
             'title' => 'Variables et types',
             'content' => "Une **variable** associe un nom à une valeur.\n\n```python\nage = 20\nnom = \"Ada\"\n```",
         ]);

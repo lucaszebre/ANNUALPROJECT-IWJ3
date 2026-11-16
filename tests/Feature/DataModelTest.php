@@ -56,7 +56,8 @@ it('stores the role on the membership, per organisation', function () {
 
 it('lets lessons be reordered in one transaction', function () {
     $course = Course::factory()->create();
-    [$first, $second] = Lesson::factory()->count(2)->for($course)->create();
+    $first = Lesson::factory()->for($course)->create(['position' => 1]);
+    $second = Lesson::factory()->for($course)->create(['position' => 2]);
 
     // Swapping positions goes through a duplicate; the deferred constraint only checks the end state.
     $first->update(['position' => 2]);
@@ -68,7 +69,8 @@ it('lets lessons be reordered in one transaction', function () {
 
 it('refuses two lessons at the same position in a course', function () {
     $course = Course::factory()->create();
-    [, $second] = Lesson::factory()->count(2)->for($course)->create();
+    Lesson::factory()->for($course)->create(['position' => 1]);
+    $second = Lesson::factory()->for($course)->create(['position' => 2]);
 
     $second->update(['position' => 1]);
     DB::statement('set constraints all immediate');
