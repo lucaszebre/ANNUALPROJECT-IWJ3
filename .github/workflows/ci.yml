@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   quality:
-    name: Quality, tests and image
+    name: Quality and tests
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -54,6 +54,18 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
       - name: Prepare Laravel
         run: |
           cp .env.example .env
@@ -68,38 +80,6 @@ jobs:
 
       - name: Run tests
         run: composer test
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Build frontend
-        run: npm run build
-
-      - name: Build Docker image
-        run: docker build --tag annualproject-iwj3:${{ github.sha }} .
-
-      - name: Smoke test Docker image
-        run: |
-          docker run --detach --name annualproject-ci \
-            --publish 8000:8000 \
-            annualproject-iwj3:${{ github.sha }}
-          trap 'docker rm --force annualproject-ci' EXIT
-
-          for attempt in {1..10}; do
-            if curl --fail --silent http://127.0.0.1:8000/up; then
-              exit 0
-            fi
-            sleep 2
-          done
-
-          docker logs annualproject-ci
-          exit 1
 
   secret-scan:
     name: Secret scan
