@@ -11,9 +11,12 @@ if [ "${PREPARE_PROJECT:-false}" = "true" ]; then
 
     composer install --no-interaction --prefer-dist
 
-    if ! grep -Eq '^APP_KEY=.+' .env; then
+    if [ "${PREPARE_PROJECT:-false}" = "true" ]; then
         php artisan key:generate --force
     fi
+
+    # Create/update the tables first: the queue worker, the session and the cache all use the database.
+    php artisan migrate --force
 
     # Dev only: let PHP workers (www-data) write on a bind mount owned by the host user.
     chmod -R a+rwX storage bootstrap/cache || true

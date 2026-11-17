@@ -13,7 +13,7 @@ x-php-service: &php-service
     # Inside Docker the services are reached by name, not 127.0.0.1.
     DB_HOST: postgres
     DB_PORT: "5432"
-    AWS_ENDPOINT: http://minio:9000
+    AWS_ENDPOINT: http://garage:3900
     MAIL_MAILER: smtp
     MAIL_HOST: mailpit
     MAIL_PORT: "1025"
@@ -85,8 +85,10 @@ services:
     image: node:${NODE_VERSION:-24}-alpine
     working_dir: /var/www/html
     command: ["sh", "-c", "npm ci && npm run dev -- --host 0.0.0.0"]
+    environment:
+        FORWARD_VITE_PORT: ${FORWARD_VITE_PORT:-5173} # read by vite.config.js
     ports:
-      - "127.0.0.1:5173:5173"
+      - "127.0.0.1:${FORWARD_VITE_PORT:-5173}:${FORWARD_VITE_PORT:-5173}"
     volumes:
       - .:/var/www/html
       - node_modules:/var/www/html/node_modules # Linux binaries, kept apart from the host's
@@ -99,7 +101,7 @@ services:
       POSTGRES_USER: ${DB_USERNAME:?Set DB_USERNAME in .env}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${FORWARD_DB_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro # creates app_testing on first start
@@ -110,41 +112,30 @@ services:
       retries: 10
     restart: unless-stopped
 
-  minio:
-    # Check that this image still pulls (see ADR-0007); override with MINIO_IMAGE in .env.
-    image: ${MINIO_IMAGE:-pgsty/silo:RELEASE.2026-11-12T00-00-00Z}
-    command: ["server", "/data", "--console-address", ":9001"]
-    environment:
-      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in .env}
-      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in .env}
-    ports:
-      - "127.0.0.1:9000:9000" # S3 API
-      - "127.0.0.1:9001:9001" # web console
-    volumes:
-      - minio-data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
-  minio-init:
-    image: ${MC_IMAGE:-pgsty/mc:RELEASE.2026-11-12T00-00-00Z}
-    depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_BUCKET: ${AWS_BUCKET:?Set AWS_BUCKET in .env}
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        mc alias set local http://minio:9000 "$${AWS_ACCESS_KEY_ID}" "$${AWS_SECRET_ACCESS_KEY}" &&
-        mc mb --ignore-existing "local/$${AWS_BUCKET}"
-    restart: "no"
+  garage:
+      build:
+          context: ./docker/garage
+      image: app-garage
+      environment:
+          GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?Set GARAGE_RPC_SECRET in .env}
+          GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:?Set GARAGE_ADMIN_TOKEN in .env}
+          AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in .env}
+          AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in .env}
+          AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:?Set AWS_DEFAULT_REGION in .env}
+          AWS_BUCKET: ${AWS_BUCKET:?Set AWS_BUCKET in .env}
+      ports:
+          - "127.0.0.1:${FORWARD_S3_PORT:-3900}:3900"   # S3 API (no web console)
+      volumes:
+          - ./docker/garage/garage.toml:/etc/garage.toml:ro
+          - garage-meta:/var/lib/garage/meta
+          - garage-data:/var/lib/garage/data
+      healthcheck:
+          test: ["CMD-SHELL", "test -f /tmp/garage-ready"] # created once layout, bucket and key exist
+          interval: 5s
+          timeout: 5s
+          retries: 30
+          start_period: 20s
+      restart: unless-stopped
 
   mailpit:
     image: axllent/mailpit:v1.33 # dev-only tool: pin a tag once it works for you
@@ -154,7 +145,8 @@ services:
 
 volumes:
   postgres-data:
-  minio-data:
+  garage-meta:
+  garage-data:
   vendor:
   node_modules:
   caddy-data:

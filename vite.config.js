@@ -3,6 +3,10 @@ import laravel from 'laravel-vite-plugin';
 import { bunny } from 'laravel-vite-plugin/fonts';
 import tailwindcss from '@tailwindcss/vite';
 
+// Port of the dev server. Inside Docker it comes from compose.yml (FORWARD_VITE_PORT), so the
+// port the browser uses is the same as the one the server listens on.
+const vitePort = Number(process.env.FORWARD_VITE_PORT ?? 5173);
+
 export default defineConfig({
     plugins: [
         laravel({
@@ -18,9 +22,9 @@ export default defineConfig({
     ],
     server: {
         host: '0.0.0.0',
-        port: 5173,
+        port: vitePort,
         strictPort: true,
-        origin: 'http://localhost:5173',
+        origin: `http://localhost:${vitePort}`,
         hmr: { host: 'localhost' },
         watch: {
             ignored: ['**/storage/framework/views/**'],
