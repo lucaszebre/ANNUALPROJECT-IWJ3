@@ -1,6 +1,6 @@
 # ADR-0002: Frontend with Blade + Livewire (Alpine.js included)
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-21
 - **Deciders:** Lucas, Pauline and Yohan
 

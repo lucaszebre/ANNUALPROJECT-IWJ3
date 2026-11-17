@@ -1,6 +1,6 @@
 # ADR-0001: Pin the PHP and Laravel versions
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-21
 - **Deciders:** Lucas, Pauline and Yohan
 

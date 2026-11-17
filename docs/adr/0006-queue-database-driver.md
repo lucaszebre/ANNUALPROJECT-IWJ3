@@ -1,6 +1,6 @@
 # ADR-0006: Queue driver: `database` on PostgreSQL, one queue and one worker per job type
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-21
 - **Deciders:** Lucas, Pauline and Yohan
 

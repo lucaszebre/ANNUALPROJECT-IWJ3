@@ -1,6 +1,6 @@
 # ADR-0004: Authentication scaffolding: Fortify + our own Blade views
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-21
 - **Deciders:** Lucas, Pauline and Yohan
 

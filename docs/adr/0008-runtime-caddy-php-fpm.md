@@ -1,6 +1,6 @@
 # ADR-0008: Docker runtime: Caddy + PHP-FPM (drop nginx)
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-21
 - **Deciders:** Lucas, Pauline and Yohan
 
@@ -20,5 +20,5 @@ PHP-FPM keeps request isolation (no shared state between requests), which is why
 ## Consequences
 - **Positive:** a simpler chain (browser → Caddy → PHP-FPM), automatic certificate issuance and renewal, a short Caddyfile.
 - **Negative / trade-offs:** `php_fastcgi` checks that files exist under its `root`, so the `web` image must contain `public/` (built assets + `index.php`), not just proxy blindly; in development `./public` is bind-mounted. Caddy data (certificates) needs a persistent volume (`caddy_data`).
-- **Upload limits:** Caddy sets no request body limit by default; we set one explicitly (`request_body { max_size ... }`), together with PHP's `upload_max_filesize` / `post_max_size`. Large video uploads may bypass PHP entirely (direct-to-MinIO uploads): to be decided in the upload feature, not here.
-- **Impact:** the issue #9 compose/Dockerfile uses a `caddy` web service instead of nginx (see `pr56-and-docker-fixes.md`). Same PHP-FPM image for `app`, queue workers and scheduler.
+- **Upload limits:** Caddy sets no request body limit by default; we set one explicitly (`request_body { max_size ... }`), together with PHP's `upload_max_filesize` / `post_max_size`. Large video uploads may bypass PHP entirely (direct-to-storage uploads (ADR-0007)): to be decided in the upload feature, not here.
+- **Impact:** the issue #9 compose/Dockerfile uses a `caddy` web service instead of nginx. Same PHP-FPM image for `app`, queue workers and scheduler.

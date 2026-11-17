@@ -1,6 +1,6 @@
 # ADR-0003: CSS approach: Tailwind CSS via Vite
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-21
 - **Deciders:** Lucas, Pauline and Yohan
 

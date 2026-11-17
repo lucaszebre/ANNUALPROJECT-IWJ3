@@ -1,6 +1,6 @@
 # ADR-0009: Quality tooling: Pest, Laravel Pint, Larastan
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-21
 - **Deciders:** Lucas, Pauline and Yohan
 
