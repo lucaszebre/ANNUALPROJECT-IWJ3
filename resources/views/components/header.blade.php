@@ -4,6 +4,7 @@
     Signed-in student: links with "Mes apprentissages", search, organisation, account menu.
     Teachers also get "Mes cours" and admins "Administration" (gates in AppServiceProvider).
     $active: home, catalog, learning, teaching or admin.
+    The full header needs 1280 px (xl); below that, the "Menu" button opens the links.
 --}}
 @props(['active' => null])
 
@@ -17,7 +18,7 @@
     <div class="page-x flex h-header items-center gap-6">
         <x-brand class="shrink-0" />
 
-        <nav aria-label="Navigation principale" class="ml-2 hidden items-center gap-6 lg:flex xl:ml-6 xl:gap-11">
+        <nav aria-label="Navigation principale" class="ml-6 hidden items-center gap-11 xl:flex">
             <x-nav-link :href="url('/')" :active="$active === 'home'">Accueil</x-nav-link>
             <x-nav-link :href="$link('catalog')" :active="$active === 'catalog'">Catalogue</x-nav-link>
             @auth
@@ -31,7 +32,7 @@
             @endcan
         </nav>
 
-        <div class="ml-auto hidden items-center gap-4 lg:flex">
+        <div class="ml-auto hidden items-center gap-4 xl:flex">
             @auth
                 <x-search-bar :action="$link('search')" size="sm" placeholder="Rechercher une notion…" class="mr-2" />
                 @if ($membership)
@@ -47,7 +48,7 @@
 
         <button
             type="button"
-            class="ml-auto flex h-11 items-center rounded-button border border-line px-4 text-label font-semibold text-ink lg:hidden"
+            class="ml-auto flex h-11 items-center rounded-button border border-line px-4 text-label font-semibold text-ink xl:hidden"
             x-on:click="menuOpen = ! menuOpen"
             x-bind:aria-expanded="menuOpen"
             aria-controls="mobile-menu"
@@ -55,7 +56,7 @@
         >Menu</button>
     </div>
 
-    <div id="mobile-menu" x-cloak x-show="menuOpen" class="page-x flex flex-col gap-4 border-t border-line py-4 lg:hidden">
+    <div id="mobile-menu" x-cloak x-show="menuOpen" class="page-x flex flex-col gap-4 border-t border-line py-4 xl:hidden">
         <x-search-bar :action="$link(auth()->check() ? 'search' : 'catalog')" size="md" />
         <nav aria-label="Navigation principale (mobile)" class="flex flex-col gap-3">
             <x-nav-link :href="url('/')" :active="$active === 'home'">Accueil</x-nav-link>

@@ -14,8 +14,8 @@
 
 @php
     $sizes = [
-        'sm' => ['form' => 'h-[42px] w-full lg:w-[258px] bg-canvas rounded-field', 'input' => 'pl-[42px] text-2xs', 'icon' => 'search', 'iconPos' => 'left-[13px]'],
-        'md' => ['form' => 'h-[42px] w-full lg:w-[360px] bg-canvas rounded-field', 'input' => 'pl-11 text-label', 'icon' => 'search', 'iconPos' => 'left-[14px]'],
+        'sm' => ['form' => 'h-[42px] w-full xl:w-[258px] bg-canvas rounded-field', 'input' => 'pl-[42px] text-2xs', 'icon' => 'search', 'iconPos' => 'left-[13px]'],
+        'md' => ['form' => 'h-[42px] w-full xl:w-[360px] bg-canvas rounded-field', 'input' => 'pl-11 text-label', 'icon' => 'search', 'iconPos' => 'left-[14px]'],
         'lg' => ['form' => 'h-[54px] w-full bg-white border border-primary rounded-tile', 'input' => 'pl-[53px] text-base', 'icon' => 'search-lg', 'iconPos' => 'left-[15px]'],
     ][$size];
 @endphp
