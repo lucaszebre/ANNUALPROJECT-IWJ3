@@ -24,6 +24,9 @@ class Lesson extends Model
         return $this->belongsTo(Course::class);
     }
 
+    /**
+     * @return HasOne<Video, $this>
+     */
     public function video(): HasOne
     {
         return $this->hasOne(Video::class);
@@ -65,6 +68,32 @@ class Lesson extends Model
         return $this->belongsToMany(User::class, 'lesson_completions')
             ->withPivot('source')
             ->withTimestamps();
+    }
+
+    /**
+     * What the lesson contains, as shown in the programme: "Vidéo + texte", "Exercice"…
+     * Needs the video, exercise and quiz relations loaded.
+     */
+    public function contentSummary(): string
+    {
+        $parts = array_keys(array_filter([
+            'vidéo' => $this->video !== null,
+            'texte' => filled($this->content),
+            'exercice' => $this->exercise !== null,
+            'quiz' => $this->quiz !== null,
+        ]));
+
+        return ucfirst(implode(' + ', $parts));
+    }
+
+    /**
+     * Length of the lesson video in minutes, null while it is unknown (no video, or not transcoded yet).
+     */
+    public function durationMinutes(): ?int
+    {
+        $seconds = $this->video?->duration_seconds;
+
+        return $seconds ? (int) ceil($seconds / 60) : null;
     }
 
     protected function casts(): array

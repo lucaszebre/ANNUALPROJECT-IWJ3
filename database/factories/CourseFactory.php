@@ -2,7 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Enums\CourseLevel;
 use App\Enums\CourseStatus;
+use App\Enums\CoverTone;
 use App\Models\Course;
 use App\Models\Organization;
 use App\Models\User;
@@ -26,6 +28,8 @@ class CourseFactory extends Factory
             'slug' => Str::slug($title),
             'description' => fake()->paragraph(),
             'status' => CourseStatus::Draft,
+            'level' => CourseLevel::Beginner,
+            'cover_tone' => CoverTone::Soft,
         ];
     }
 
