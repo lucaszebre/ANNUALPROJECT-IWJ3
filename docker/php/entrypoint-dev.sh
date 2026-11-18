@@ -11,7 +11,7 @@ if [ "${PREPARE_PROJECT:-false}" = "true" ]; then
 
     composer install --no-interaction --prefer-dist
 
-    if [ "${PREPARE_PROJECT:-false}" = "true" ]; then
+    if ! grep -Eq '^APP_KEY=.+' .env; then
         php artisan key:generate --force
     fi
 
