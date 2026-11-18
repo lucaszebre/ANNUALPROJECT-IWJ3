@@ -6,6 +6,11 @@
 *.md diff=markdown
 *.php diff=php
 
+*.sh text eol=lf
+Dockerfile text eol=lf
+compose.yml text eol=lf
+docker/** text eol=lf
+
 /.github export-ignore
 CHANGELOG.md export-ignore
 .styleci.yml export-ignore
