@@ -49,6 +49,20 @@ it('filters the catalogue by search, category and level', function () {
         ->assertSee('Aucun cours trouvé');
 });
 
+it('ignores array query parameters instead of failing', function () {
+    publishedCourse(['title' => 'Découvrir PHP']);
+
+    $this->get('/catalogue?q[]=x&categorie[]=y&niveau[]=z')
+        ->assertOk()
+        ->assertSee('Découvrir PHP');
+});
+
+it('sends a visitor who opens "Commencer" directly to the login page', function () {
+    $course = publishedCourse();
+
+    $this->get(route('courses.start', $course))->assertRedirect(route('login'));
+});
+
 it('paginates the catalogue and keeps the filters in the links', function () {
     foreach (range(1, 13) as $number) {
         publishedCourse(['title' => "Cours {$number}", 'category_id' => $this->web->id]);

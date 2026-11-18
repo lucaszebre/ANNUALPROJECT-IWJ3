@@ -22,7 +22,7 @@
 
         {{-- Figma "Cours / Présentation" --}}
         <section class="mt-6 flex items-center justify-between gap-8 rounded-overlay bg-soft p-7 lg:pr-[36px]">
-            <div class="max-w-[900px]">
+            <div class="min-w-0 max-w-[900px]">
                 <x-badge tone="white">{{ mb_strtoupper($course->level->label()) }}</x-badge>
                 <h1 class="mt-7 text-[clamp(2rem,5vw,3rem)] leading-[1.22] tracking-[-0.03em]">{{ $course->title }}</h1>
                 @if ($course->description)
@@ -41,7 +41,7 @@
             <x-course-cover :course="$course" size="hero" class="hidden shrink-0 md:flex" />
         </section>
 
-        <div class="mt-11 grid gap-8 lg:grid-cols-[1fr_408px]">
+        <div class="mt-11 grid gap-8 lg:grid-cols-[minmax(0,1fr)_408px]">
             {{-- Programme --}}
             <section id="programme" aria-labelledby="programme-title" x-data="{ q: '', matches(title) { return title.includes(this.q.trim().toLowerCase()) } }">
                 <h2 id="programme-title" class="text-[29px] leading-[1.5]">Le programme</h2>

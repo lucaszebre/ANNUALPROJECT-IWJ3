@@ -19,9 +19,10 @@ class CatalogController extends Controller
     public function index(Request $request): View
     {
         $user = $request->user();
-        $search = trim((string) $request->query('q', ''));
-        $category = $request->query('categorie');
-        $level = CourseLevel::tryFrom((string) $request->query('niveau'));
+        // Query strings can hold arrays (?q[]=x): anything that is not a string is ignored.
+        $search = is_string($request->query('q')) ? trim($request->query('q')) : '';
+        $category = is_string($request->query('categorie')) ? $request->query('categorie') : null;
+        $level = is_string($request->query('niveau')) ? CourseLevel::tryFrom($request->query('niveau')) : null;
 
         $courses = Course::visibleTo($user)
             ->with(['owner', 'category'])
@@ -33,6 +34,7 @@ class CatalogController extends Controller
             ->when($category, fn ($query) => $query->whereRelation('category', 'slug', $category))
             ->when($level, fn ($query) => $query->where('level', $level))
             ->orderByDesc('published_at')
+            ->orderBy('id') // stable order when courses share a publication time
             ->paginate(12)
             ->withQueryString();
 

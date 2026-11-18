@@ -1,4 +1,4 @@
-{{-- Catalogue (Figma "02 · Catalogue" and "08 · Catalogue connecté"). --}}
+{{-- Catalogue (Figma "02 · Catalogue"). --}}
 <x-layouts.app title="Catalogue" active="catalog">
     <div class="page-x pt-9 pb-16">
         <x-badge>LE CATALOGUE</x-badge>
