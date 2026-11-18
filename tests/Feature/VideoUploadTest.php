@@ -16,7 +16,7 @@ use Illuminate\Testing\TestResponse;
 beforeEach(function () {
     Storage::fake('s3');
     Storage::fake('s3_signing')->buildTemporaryUploadUrlsUsing(
-        fn (string $path) => ['url' => "https://minio.test/app/{$path}?X-Amz-Signature=fake", 'headers' => []],
+        fn (string $path) => ['url' => "https://s3.test/app/{$path}?X-Amz-Signature=fake", 'headers' => []],
     );
 
     $this->organization = Organization::factory()->create();
@@ -40,14 +40,14 @@ function pendingUploadPath(Lesson $lesson): ?string
     return session("video_uploads.{$lesson->id}");
 }
 
-it('gives the course owner a signed URL to upload the video straight to MinIO', function () {
+it('gives the course owner a signed URL to upload the video straight to the S3 storage', function () {
     $this->actingAs($this->teacher);
     $response = requestUploadUrl($this->lesson);
 
     $path = pendingUploadPath($this->lesson);
 
     $response->assertOk()->assertJson([
-        'url' => "https://minio.test/app/{$path}?X-Amz-Signature=fake",
+        'url' => "https://s3.test/app/{$path}?X-Amz-Signature=fake",
         'method' => 'PUT',
         'headers' => ['Content-Type' => 'video/mp4'],
     ]);
@@ -98,7 +98,7 @@ it('refuses a second video on the same lesson', function () {
     requestUploadUrl($this->lesson)->assertConflict();
 });
 
-it('creates the video and queues its transcoding once the file is on MinIO', function () {
+it('creates the video and queues its transcoding once the file is on the S3 storage', function () {
     Queue::fake();
     $this->actingAs($this->teacher);
     requestUploadUrl($this->lesson)->assertOk();

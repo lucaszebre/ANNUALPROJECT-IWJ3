@@ -3,7 +3,7 @@
 return [
 
     /*
-    | Largest video a teacher can upload. The file goes straight to MinIO,
+    | Largest video a teacher can upload. The file goes straight to the S3 storage (Garage),
     | so this limit does not depend on PHP's upload_max_filesize.
     */
     'max_upload_bytes' => (int) env('VIDEO_MAX_UPLOAD_MB', 2048) * 1024 * 1024,

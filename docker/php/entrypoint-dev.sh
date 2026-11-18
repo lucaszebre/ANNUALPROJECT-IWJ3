@@ -18,6 +18,9 @@ if [ "${PREPARE_PROJECT:-false}" = "true" ]; then
     # Create/update the tables first: the queue worker, the session and the cache all use the database.
     php artisan migrate --force
 
+    # Let the browser upload to the bucket from APP_URL (#21). Garage is healthy before this container starts.
+    php artisan storage:cors || echo "WARNING: could not set the bucket CORS rules" >&2
+
     # Dev only: let PHP workers (www-data) write on a bind mount owned by the host user.
     chmod -R a+rwX storage bootstrap/cache || true
 fi

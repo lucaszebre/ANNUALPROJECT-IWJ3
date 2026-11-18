@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Video upload in two steps, so the file goes straight from the browser to MinIO:
+ * Video upload in two steps, so the file goes straight from the browser to the S3 storage (Garage):
  * 1. create() returns a signed URL the browser sends the file to with a PUT;
  * 2. store() checks the uploaded file, creates the video and queues the transcoding.
  */

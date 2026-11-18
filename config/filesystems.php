@@ -61,7 +61,7 @@ return [
         ],
 
         // Only used to sign URLs for the browser (ADR-0007). A signed URL includes its
-        // host, so it is signed for the public MinIO address, not the internal one.
+        // host, so it is signed for the public S3 address, not the internal one.
         's3_signing' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
