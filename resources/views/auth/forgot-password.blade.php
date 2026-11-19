@@ -1,4 +1,3 @@
-
 <x-guest-layout>
     <h1>Mot de passe oublié</h1>
 

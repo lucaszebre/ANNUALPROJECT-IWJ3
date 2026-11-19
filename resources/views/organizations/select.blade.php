@@ -1,4 +1,3 @@
-
 <x-guest-layout>
     <h1>Choisir une organisation</h1>
 

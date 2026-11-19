@@ -25,5 +25,5 @@ it('rate limits repeated login attempts', function () {
         'password' => 'wrong-password',
     ]);
 
-    $response->assertSessionHasErrors('email');
+    $response->assertStatus(429);
 });

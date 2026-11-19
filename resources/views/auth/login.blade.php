@@ -1,4 +1,3 @@
-
 <x-guest-layout>
     <h1>Connexion</h1>
 
@@ -37,5 +36,4 @@
 
     <a href="{{ route('password.request') }}">Mot de passe oublié ?</a>
     <a href="{{ route('register') }}">Créer un compte</a>
-    
-<x-guest-layout>
+</x-guest-layout>

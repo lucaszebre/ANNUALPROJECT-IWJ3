@@ -1,4 +1,3 @@
-
 <x-guest-layout>
     <h1>Créer un compte</h1>
 

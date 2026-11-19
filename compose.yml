@@ -87,6 +87,7 @@ services:
     command: ["sh", "-c", "npm ci && npm run dev -- --host 0.0.0.0"]
     environment:
         FORWARD_VITE_PORT: ${FORWARD_VITE_PORT:-5173} # read by vite.config.js
+        APP_PORT: ${APP_PORT:-8000}
     ports:
       - "127.0.0.1:${FORWARD_VITE_PORT:-5173}:${FORWARD_VITE_PORT:-5173}"
     volumes:
