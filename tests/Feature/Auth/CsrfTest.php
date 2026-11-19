@@ -2,6 +2,7 @@
 
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
 use Symfony\Component\HttpFoundation\HeaderBag;
 
 it('rejects a login request without a csrf token', function () {
@@ -22,7 +23,7 @@ it('rejects a login request without a csrf token', function () {
     try {
         $middleware->handle($request, fn () => response('unexpected'));
         test()->fail('The request was not rejected.');
-    } catch (Illuminate\Session\TokenMismatchException) {
+    } catch (TokenMismatchException) {
         expect(true)->toBeTrue();
     }
 });
