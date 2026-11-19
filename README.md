@@ -171,7 +171,7 @@ Useful commands:
 docker compose exec app composer test            # Pest, on the app_testing database
 docker compose exec app ./vendor/bin/pint --test
 docker compose exec app php artisan <command>
-docker compose restart queue queue-long          # after changing job code
+docker compose restart queue queue-transcoding queue-transcription   # after changing job code
 docker compose down                              # stop (data kept)
 docker compose down -v                           # stop and delete all data volumes
 ```
@@ -181,7 +181,7 @@ Notes:
 are already taken, set `FORWARD_DB_PORT` / `FORWARD_VITE_PORT` / `FORWARD_S3_PORT` in `.env` (and `APP_PORT` for the
 application).
 - On its first start the `garage` container creates the storage layout, the bucket and the access key by itself (`docker/garage/entrypoint.sh`). The access key ID must be `GK` + 24 hex characters, the secret 64 hex characters, and `AWS_DEFAULT_REGION` must equal `s3_region` in `docker/garage/garage.toml`.
-- Two queue workers run: `queue` for short jobs (`default`) and `queue-long` for transcoding and transcription (`database_long` connection, ADR-0006).
+- Three queue workers run: `queue` for short jobs (`default`), `queue-transcoding` and `queue-transcription` (`database_long` connection). One worker per long queue, so a transcription never holds up a transcoding (ADR-0006).
 - Inside the containers the services are reached by name (`postgres`, `garage`, `mailpit`); these overrides live in `compose.yml`, so `.env` can keep `127.0.0.1` values for tools run on your machine.
 - Production uses the `app` and `web` targets of the `Dockerfile` (code baked in, no bind mounts).
 
