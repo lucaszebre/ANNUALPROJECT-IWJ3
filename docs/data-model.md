@@ -10,7 +10,7 @@ Target: **Laravel 13** (ADR-0001) with **PostgreSQL** (ADR-0005, needed for full
 - Every table has `created_at` / `updated_at` (`$table->timestamps()`); they are not repeated in the diagrams.
 - Primary keys are **UUIDs** (`HasUuids` trait, which generates ordered UUID v7 since Laravel 12), except for the two high-volume internal tables `transcript_segments` and `playback_events`, which use a normal auto-increment `id()`.
 - Status columns are strings backed by **PHP enums** (`VideoStatus::Ready`) and cast in the model.
-- Files (videos, HLS playlists, thumbnails) live on the `s3` disk (MinIO). The database only stores their **paths**.
+- Files (videos, HLS playlists, thumbnails) live on the `s3` disk (Garage). The database only stores their **paths**.
 
 ## 2. Overview (conceptual model)
 
@@ -133,7 +133,7 @@ erDiagram
         uuid organization_id FK
         uuid lesson_id FK "unique: 0 or 1 video per lesson"
         string status "VideoStatus: uploaded | processing | ready | failed"
-        string source_path "original upload on MinIO"
+        string source_path "original upload on the s3 disk"
         string hls_path "master.m3u8, set when ready"
         string thumbnail_path
         int duration_seconds
@@ -387,7 +387,7 @@ Lessons are ordered by `position`, unique per course. PostgreSQL checks a normal
 Rule: *a video is only visible once its transcoding is finished.*
 
 - `status` follows `uploaded → processing → ready | failed`. A local scope `Video::ready()` is used for everything students see, and `hls_path` is only set when the transcode job succeeds.
-- The database stores **paths** on the MinIO disk, never URLs or files, so the storage can move without a data migration. Videos are never public. `Storage::temporaryUrl()` signs one file, but an HLS playlist points to its segments by relative path, and each segment needs its own signature. How segments are served (through the app, or by rewriting the playlist with signed URLs) is decided in ADR-0007.
+- The database stores **paths** on the `s3` disk, never URLs or files, so the storage can move without a data migration. Videos are never public. `Storage::temporaryUrl()` signs one file, but an HLS playlist points to its segments by relative path, and each segment needs its own signature. How segments are served (through the app, or by rewriting the playlist with signed URLs) is decided in ADR-0007.
 - `size_bytes` feeds the video storage quota: `Video::sum('size_bytes')` for the organisation.
 
 ### 4.5 Transcripts: segments, not one big text
