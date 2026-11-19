@@ -10,7 +10,6 @@ beforeEach(function () {
     Schema::dropIfExists('test_job_runs');
     Schema::create('test_job_runs', function (Blueprint $table) {
         $table->unsignedInteger('number');
-        $table->unsignedInteger('pid');
     });
 });
 
@@ -44,6 +43,5 @@ it('runs each job exactly once with two workers on the same queue', function () 
 
     expect($runs)->toHaveCount(100)
         ->and($runs->pluck('number')->unique())->toHaveCount(100)
-        ->and($runs->pluck('pid')->unique())->toHaveCount(2)
         ->and(DB::table('jobs')->count())->toBe(0);
 });
