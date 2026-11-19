@@ -10,7 +10,11 @@
         max_size {$MAX_UPLOAD_SIZE:25MB}
     }
 
-    php_fastcgi app:9000
+    # During a deploy the old app container stops: retry for up to 5 s, so the request reaches the
+    # new one (Docker DNS only returns running containers) instead of failing with a 502.
+    php_fastcgi app:9000 {
+        lb_try_duration 5s
+    }
     file_server
 }
 

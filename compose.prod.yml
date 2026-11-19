@@ -1,7 +1,8 @@
-# Production stack, for the VPS:
-#   docker compose -f compose.prod.yml up -d --build
-# The code is baked into the images (`app` and `web` targets of the Dockerfile): to deploy a new
-# version, `git pull` then run the same command again.
+# Production stack, for the VPS.
+#   First install:  docker compose -f compose.prod.yml up -d --build
+#   Every deploy:   scripts/deploy.sh (run by .github/workflows/deploy.yml), with no downtime:
+#                   the app is rolled out with `docker rollout`, Caddy is reloaded, never restarted.
+# The code is baked into the `app` image (target `app` of the Dockerfile).
 # No secrets here: every value comes from `.env` (see the production section of .env.example).
 
 x-php-service: &php-service
@@ -49,15 +50,25 @@ services:
       retries: 10
       start_period: 30s
 
+  # Copies the static files of the new image (public/) into the volume Caddy serves, before the app
+  # is rolled out. Vite gives assets hashed names, so pages of the old version still find theirs.
+  assets:
+    image: app-prod
+    pull_policy: never
+    user: root
+    entrypoint: ["sh", "-c", "cp -a /var/www/html/public/. /assets/"]
+    volumes:
+      - public-assets:/assets
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # Stock Caddy image: a deploy never restarts it, `caddy reload` applies a new Caddyfile without
+  # dropping connections. The directory is mounted (not the file) so a git checkout is seen.
   web:
-    build:
-      context: .
-      target: web
-      args:
-        PHP_VERSION: ${PHP_VERSION:-8.5}
-        NODE_VERSION: ${NODE_VERSION:-24}
-        CADDY_VERSION: ${CADDY_VERSION:-2.10}
-    image: app-web-prod
+    image: caddy:${CADDY_VERSION:-2.10}-alpine
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile.prod", "--adapter", "caddyfile"]
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:?Set SITE_ADDRESS in .env}
       S3_SITE_ADDRESS: ${S3_SITE_ADDRESS:?Set S3_SITE_ADDRESS in .env}
@@ -66,28 +77,35 @@ services:
       - "443:443"
       - "443:443/udp" # HTTP/3
     volumes:
-      - ./docker/caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - ./docker/caddy:/etc/caddy:ro
+      - public-assets:/var/www/html/public:ro
       - caddy-data:/data # certificates: keep this volume
       - caddy-config:/config
     depends_on:
+      assets:
+        condition: service_completed_successfully
       app:
         condition: service_healthy
       garage:
         condition: service_healthy
     restart: unless-stopped
 
+  # On a deploy, a worker gets SIGTERM, finishes its current job, then exits (stop_grace_period).
   queue:
     <<: *php-service
     command: ["php", "artisan", "queue:work", "--queue=default", "--tries=3", "--sleep=3", "--max-time=3600"]
+    stop_grace_period: 60s
 
   # Long jobs on the database_long connection, one worker per queue (ADR-0006).
   queue-transcoding:
     <<: *php-service
     command: ["php", "artisan", "queue:work", "database_long", "--queue=transcoding", "--timeout=3600", "--tries=2", "--sleep=3", "--max-time=7200"]
+    stop_grace_period: 5m
 
   queue-transcription:
     <<: *php-service
     command: ["php", "artisan", "queue:work", "database_long", "--queue=transcription", "--timeout=3600", "--tries=2", "--sleep=3", "--max-time=7200"]
+    stop_grace_period: 5m
 
   scheduler:
     <<: *php-service
@@ -140,3 +158,4 @@ volumes:
   garage-data:
   caddy-data:
   caddy-config:
+  public-assets:
