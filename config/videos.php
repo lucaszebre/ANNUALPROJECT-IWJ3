@@ -23,4 +23,32 @@ return [
     */
     'upload_url_ttl_minutes' => 60,
 
+    /*
+    | HLS renditions made by the transcoding job, smallest first. A rendition taller than
+    | the source is skipped, except the smallest one, so every video gets at least one.
+    | Bitrates are in kbit/s.
+    */
+    'renditions' => [
+        '360p' => ['height' => 360, 'video_bitrate' => 800],
+        '720p' => ['height' => 720, 'video_bitrate' => 2800],
+    ],
+
+    'audio_bitrate' => 128,
+
+    /*
+    | Length of one HLS segment, in seconds.
+    */
+    'segment_seconds' => 6,
+
+    /*
+    | Longest ffmpeg run. Must stay below the timeout of the TranscodeVideo job.
+    */
+    'ffmpeg_timeout_seconds' => 3300,
+
+    /*
+    | How long the signed segment and thumbnail URLs given to the player stay valid.
+    | Longer than a video plus its pauses: the player must reload the playlist after that.
+    */
+    'playback_url_ttl_minutes' => 360,
+
 ];
