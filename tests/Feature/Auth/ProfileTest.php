@@ -50,6 +50,7 @@ it('updates the name and email', function () {
         ->put(route('user-profile-information.update'), [
             'name' => 'Camille Martin',
             'email' => 'camille.martin@example.test',
+            'email_current_password' => 'password',
         ])
         ->assertRedirect(route('profile'))
         ->assertSessionHas('status', 'profile-information-updated');
@@ -113,4 +114,35 @@ it('rejects a wrong current password or a weak new one', function () {
         ->assertSee('Le champ mot de passe doit contenir au moins 12 caractères.');
 
     expect(Hash::check('OldPassword4242', $user->refresh()->password))->toBeTrue();
+});
+
+it('refuses to change the email without the current password', function () {
+    $user = User::factory()->create(['email' => 'camille@example.test']);
+
+    $this->actingAs($user)
+        ->from(route('profile'))
+        ->put(route('user-profile-information.update'), [
+            'name' => $user->name,
+            'email' => 'attacker@example.test',
+        ])
+        ->assertRedirect(route('profile'))
+        ->assertSessionHasErrors('email_current_password');
+
+    expect($user->refresh()->email)->toBe('camille@example.test');
+});
+
+it('refuses to change the email with a wrong current password', function () {
+    $user = User::factory()->create(['email' => 'camille@example.test']);
+
+    $this->actingAs($user)
+        ->from(route('profile'))
+        ->put(route('user-profile-information.update'), [
+            'name' => $user->name,
+            'email' => 'attacker@example.test',
+            'email_current_password' => 'wrong-password',
+        ])
+        ->assertRedirect(route('profile'))
+        ->assertSessionHasErrors('email_current_password');
+
+    expect($user->refresh()->email)->toBe('camille@example.test');
 });

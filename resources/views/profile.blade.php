@@ -1,8 +1,3 @@
-{{--
-    Figma "20 · Mon profil": personal information, security, organisation and logout.
-    Fortify validates with the "updateProfileInformation" and "updatePassword" error bags
-    and redirects back with session('status'), which opens "34 · Profil mis à jour".
---}}
 <x-layouts.app title="Mon profil">
     <div class="page-x py-10">
         <p class="text-2xs font-semibold text-primary uppercase">Mon compte</p>
@@ -22,7 +17,6 @@
                             name="name"
                             label="Nom complet"
                             :value="$user->name"
-                            bag="updateProfileInformation"
                             required
                             autocomplete="name"
                         />
@@ -32,9 +26,16 @@
                             type="email"
                             label="Adresse email"
                             :value="$user->email"
-                            bag="updateProfileInformation"
                             required
                             autocomplete="email"
+                        />
+
+                        <x-input
+                            name="email_current_password"
+                            type="password"
+                            label="Mot de passe actuel"
+                            hint="Requis uniquement pour changer d'adresse email."
+                            autocomplete="current-password"
                         />
 
                         <x-button class="mt-4 w-full">Enregistrer les modifications</x-button>
@@ -74,7 +75,6 @@
                             type="password"
                             label="Mot de passe actuel"
                             placeholder="••••••••••••"
-                            bag="updatePassword"
                             required
                             autocomplete="current-password"
                         />
@@ -85,7 +85,6 @@
                             label="Nouveau mot de passe"
                             placeholder="12 caractères minimum"
                             hint="Au moins 12 caractères, avec une majuscule, une minuscule et un chiffre."
-                            bag="updatePassword"
                             required
                             autocomplete="new-password"
                         />
@@ -95,7 +94,6 @@
                             type="password"
                             label="Confirmer le nouveau mot de passe"
                             placeholder="••••••••••••"
-                            bag="updatePassword"
                             required
                             autocomplete="new-password"
                         />
