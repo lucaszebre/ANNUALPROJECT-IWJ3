@@ -16,6 +16,12 @@ return [
     'name' => env('APP_NAME', 'Laravel'),
 
     /*
+    | Name shown to users in the interface (provisional name from the mockups).
+    */
+
+    'brand' => env('APP_BRAND', 'CodeCampus'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------

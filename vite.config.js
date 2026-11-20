@@ -12,10 +12,12 @@ export default defineConfig({
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.js'],
             refresh: true,
+            // Fonts of the CodeCampus design system: Manrope for titles,
+            // Inter for text, JetBrains Mono for code.
             fonts: [
-                bunny('Instrument Sans', {
-                    weights: [400, 500, 600],
-                }),
+                bunny('Inter', { weights: [400, 600] }),
+                bunny('Manrope', { weights: [700] }),
+                bunny('JetBrains Mono', { weights: [400] }),
             ],
         }),
         tailwindcss(),
