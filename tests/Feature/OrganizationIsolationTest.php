@@ -1,11 +1,21 @@
 <?php
 
 use App\Models\Category;
+use App\Models\Comment;
+use App\Models\CommentReport;
 use App\Models\Course;
+use App\Models\Exercise;
 use App\Models\Lesson;
 use App\Models\Membership;
 use App\Models\Organization;
+use App\Models\PlaybackEvent;
+use App\Models\Quiz;
+use App\Models\QuizAttempt;
+use App\Models\Scopes\OrganizationScope;
+use App\Models\Submission;
+use App\Models\TranscriptSegment;
 use App\Models\User;
+use App\Models\Video;
 use App\Support\CurrentOrganization;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
@@ -110,4 +120,30 @@ it('forgets the organisation once the request is over', function () {
 
     expect(app(CurrentOrganization::class)->id())->toBeNull()
         ->and(Course::count())->toBe(2);
+});
+
+it('shows nothing of any organisation to a signed-in user who has not picked one', function () {
+    Route::middleware(['web', 'auth'])->get('/_test/auth-only/courses/{course}', fn (Course $course) => $course->title);
+
+    $this->actingAs(User::factory()->create())
+        ->get("/_test/auth-only/courses/{$this->courseB->id}")
+        ->assertNotFound();
+});
+
+it('refuses to create a row for a signed-in user who has not picked an organisation', function () {
+    app(CurrentOrganization::class)->lock();
+
+    Category::create(['organization_id' => $this->orgA->id, 'name' => 'Web', 'slug' => 'web']);
+})->throws(LogicException::class, 'Cannot create a Category without a current organisation.');
+
+it('scopes every tenant model of the data model', function (string $model) {
+    expect((new $model)->hasGlobalScope(OrganizationScope::class))->toBeTrue();
+})->with([
+    Category::class, Course::class, Lesson::class, Video::class, TranscriptSegment::class,
+    Comment::class, CommentReport::class, Exercise::class, Submission::class, Quiz::class,
+    QuizAttempt::class, PlaybackEvent::class,
+]);
+
+it('does not scope memberships', function () {
+    expect((new Membership)->hasGlobalScope(OrganizationScope::class))->toBeFalse();
 });

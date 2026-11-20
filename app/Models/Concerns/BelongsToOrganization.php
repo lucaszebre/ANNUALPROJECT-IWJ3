@@ -20,9 +20,14 @@ trait BelongsToOrganization
         static::addGlobalScope(new OrganizationScope);
 
         static::creating(function (Model $model): void {
-            $current = app(CurrentOrganization::class)->id();
+            $organization = app(CurrentOrganization::class);
+            $current = $organization->id();
 
             if ($current === null) {
+                if ($organization->isLocked()) {
+                    throw new LogicException(sprintf('Cannot create a %s without a current organisation.', class_basename($model)));
+                }
+
                 return;
             }
 

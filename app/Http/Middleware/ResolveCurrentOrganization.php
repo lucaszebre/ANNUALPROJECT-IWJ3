@@ -9,8 +9,9 @@ use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Runs on every web request: sets the current organisation from the session when the user
- * is still a member of it. It never redirects; `organization.selected` does that on the
+ * Runs on every web request, before route model binding: sets the current organisation from
+ * the session when the user is still a member of it, and locks a signed-in user without one
+ * out of every organisation. It never redirects; `organization.selected` does that on the
  * routes that need an organisation.
  */
 class ResolveCurrentOrganization
@@ -25,6 +26,8 @@ class ResolveCurrentOrganization
         if ($user && is_string($organizationId) && Str::isUuid($organizationId)
             && $user->organizations()->whereKey($organizationId)->exists()) {
             $this->organization->set($organizationId);
+        } elseif ($user) {
+            $this->organization->lock();
         }
 
         return $next($request);
@@ -35,6 +38,6 @@ class ResolveCurrentOrganization
      */
     public function terminate(): void
     {
-        $this->organization->set(null);
+        $this->organization->forget();
     }
 }
