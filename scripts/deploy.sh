@@ -56,8 +56,12 @@ main() {
     # 3. The web app, with no downtime.
     docker rollout -f compose.prod.yml app
 
-    # 4. The rest: workers finish their current job before being replaced; Caddy is only reloaded.
-    $compose up -d --no-deps --remove-orphans web queue queue-transcoding queue-transcription scheduler
+    # 4. Workers finish their current job, then are replaced. Forced: compose does not always see
+    #    that the app-prod tag now points to a new image, and would leave them on the old code.
+    $compose up -d --no-deps --force-recreate queue queue-transcoding queue-transcription scheduler
+
+    # 5. Caddy is only started if missing, then reloaded: never restarted.
+    $compose up -d --no-deps --remove-orphans web
     $compose exec -T web caddy reload --config /etc/caddy/Caddyfile.prod --adapter caddyfile
 
     docker image prune -f >/dev/null
