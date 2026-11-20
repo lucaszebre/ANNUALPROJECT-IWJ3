@@ -13,6 +13,9 @@ x-php-service: &php-service
     # Inside Docker the services are reached by name, not 127.0.0.1.
     DB_HOST: postgres
     DB_PORT: "5432"
+    DB_DATABASE: ${DB_DATABASE:?Set DB_DATABASE in .env}
+    DB_USERNAME: ${DB_USERNAME:?Set DB_USERNAME in .env}
+    DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
     AWS_ENDPOINT: http://garage:3900
     MAIL_MAILER: smtp
     MAIL_HOST: mailpit
@@ -87,6 +90,7 @@ services:
     command: ["sh", "-c", "npm ci && npm run dev -- --host 0.0.0.0"]
     environment:
         FORWARD_VITE_PORT: ${FORWARD_VITE_PORT:-5173} # read by vite.config.js
+        APP_PORT: ${APP_PORT:-8000}
     ports:
       - "127.0.0.1:${FORWARD_VITE_PORT:-5173}:${FORWARD_VITE_PORT:-5173}"
     volumes:
