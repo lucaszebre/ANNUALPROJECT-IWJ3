@@ -1,0 +1,12 @@
+# Site address: ":80" in dev (plain HTTP); set SITE_ADDRESS=your.domain in production for automatic HTTPS.
+{$SITE_ADDRESS::80} {
+    root * /var/www/html/public
+    encode zstd gzip
+
+    request_body {
+        max_size {$MAX_UPLOAD_SIZE:25MB}
+    }
+
+    php_fastcgi app:9000
+    file_server
+}

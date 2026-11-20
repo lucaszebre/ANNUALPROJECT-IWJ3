@@ -56,19 +56,19 @@ The platform brings these uses together around three pillars:
 
 ## Tech stack
 
-| Layer | Choice |
-|---|---|
-| Backend | **Laravel** (PHP) |
-| Frontend | Blade templates + **Livewire** and Alpine.js, styled with **Tailwind CSS**, built with Vite (no React, Vue or Angular, per the syllabus) |
-| Database | **PostgreSQL**: application data, the job queue and full-text search |
-| Background jobs | Laravel queues with the `database` driver, one worker per queue |
-| File storage | MinIO (S3-compatible) through Laravel's `s3` disk |
-| Video | ffmpeg → HLS streaming, played with hls.js |
-| Transcription | Whisper (whisper.cpp, on CPU) |
-| Code sandbox | Ephemeral Docker containers with no network and CPU/memory/time/process limits |
-| Reverse proxy | Caddy (automatic HTTPS) |
-| Infrastructure | Docker + `compose.yml`, on a 5-10 €/month VPS. No paid services. |
-| Quality | Pest (tests), Laravel Pint (code style), Larastan (static analysis), run in CI |
+| Layer           | Choice                                                                                                                                   |
+|-----------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| Backend         | **Laravel** (PHP)                                                                                                                        |
+| Frontend        | Blade templates + **Livewire** and Alpine.js, styled with **Tailwind CSS**, built with Vite (no React, Vue or Angular, per the syllabus) |
+| Database        | **PostgreSQL**: application data, the job queue and full-text search                                                                     |
+| Background jobs | Laravel queues with the `database` driver, one worker per queue                                                                          |
+| File storage    | Garage (S3-compatible) through Laravel's `s3` disk                                                                                       |
+| Video           | ffmpeg → HLS streaming, played with hls.js                                                                                               |
+| Transcription   | Whisper (whisper.cpp, on CPU)                                                                                                            |
+| Code sandbox    | Ephemeral Docker containers with no network and CPU/memory/time/process limits                                                           |
+| Reverse proxy   | Caddy (automatic HTTPS)                                                                                                                  |
+| Infrastructure  | Docker + `compose.yml`, on a 5-10 €/month VPS. No paid services.                                                                         |
+| Quality         | Pest (tests), Laravel Pint (code style), Larastan (static analysis), run in CI                                                           |
 
 The detailed decisions are recorded in `docs/adr/` (#3).
 
@@ -93,7 +93,7 @@ flowchart TB
     subgraph storage [Storage]
         direction LR
         pg[(PostgreSQL<br/>data, jobs, search)]
-        minio[(MinIO<br/>videos, HLS)]
+        garage[(Garage<br/>videos, HLS)]
     end
     app --> storage
     workers --> storage
@@ -148,14 +148,41 @@ Bonus points we are aiming for: advanced authentication (#47), observability (#4
 
 ## Getting started
 
-The Laravel application and its Docker setup arrive with #8 and #9. Once they are merged:
+Requirements: Docker Desktop (Compose v2). No local PHP or Node needed.
 
 ```sh
-cp .env.example .env
-docker compose up -d
-docker compose exec app php artisan key:generate
-docker compose exec app php artisan migrate --seed
+cp .env.example .env        # PowerShell: Copy-Item .env.example .env
+docker compose up -d --build
+docker compose exec app php artisan db:seed    # demo data, run once
 ```
+
+The first start takes a few minutes (image build, `composer install`, `npm ci`). The `app` container generates `APP_KEY` and runs the migrations by itself. Follow it with `docker compose logs -f app` ; `docker compose ps` shows the health of each service.
+
+| Service                      | URL                                                             |
+|------------------------------|-----------------------------------------------------------------|
+| Application                  | http://localhost:8000 (health: `/up`)                           |
+| Vite dev server (hot reload) | http://localhost:5173                                           |
+| Mailpit (dev emails)         | http://localhost:8025                                           |
+| S3 API (Garage)              | http://localhost:3900 (no web console; credentials from `.env`) |
+
+Useful commands:
+
+```sh
+docker compose exec app composer test            # Pest, on the app_testing database
+docker compose exec app ./vendor/bin/pint --test
+docker compose exec app php artisan <command>
+docker compose restart queue                     # after changing job code
+docker compose down                              # stop (data kept)
+docker compose down -v                           # stop and delete all data volumes
+```
+
+Notes:
+- PostgreSQL, the Vite dev server and the S3 API are published on `127.0.0.1:5432`, `5173` and `3900`. If those ports
+are already taken, set `FORWARD_DB_PORT` / `FORWARD_VITE_PORT` / `FORWARD_S3_PORT` in `.env` (and `APP_PORT` for the
+application).
+- On its first start the `garage` container creates the storage layout, the bucket and the access key by itself (`docker/garage/entrypoint.sh`). The access key ID must be `GK` + 24 hex characters, the secret 64 hex characters, and `AWS_DEFAULT_REGION` must equal `s3_region` in `docker/garage/garage.toml`.
+- Inside the containers the services are reached by name (`postgres`, `garage`, `mailpit`); these overrides live in `compose.yml`, so `.env` can keep `127.0.0.1` values for tools run on your machine.
+- Production uses the `app` and `web` targets of the `Dockerfile` (code baked in, no bind mounts).
 
 ## Deliverables
 
