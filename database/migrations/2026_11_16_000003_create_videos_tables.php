@@ -14,8 +14,8 @@ return new class extends Migration
      * @var array<string, string>
      */
     private array $searchConfigs = [
-        'fr_unaccent' => 'french',
-        'en_unaccent' => 'english',
+        'french_unaccent' => 'french',
+        'english_unaccent' => 'english',
     ];
 
     public function up(): void
