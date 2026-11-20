@@ -1,29 +1,21 @@
 <?php
 
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
-use Illuminate\Http\Request;
-use Illuminate\Session\TokenMismatchException;
-use Symfony\Component\HttpFoundation\HeaderBag;
 
 it('rejects a login request without a csrf token', function () {
-    $middleware = new class(app(), app('encrypter')) extends PreventRequestForgery
-    {
-        protected function runningUnitTests()
-        {
-            return false;
-        }
-    };
-
-    $request = Request::create('/login', 'POST');
-    $request->headers = new HeaderBag([
-        'Sec-Fetch-Site' => 'cross-site',
-    ]);
-    $request->setLaravelSession(app('session')->driver());
+    $this->app->instance('env', 'local');
 
     try {
-        $middleware->handle($request, fn () => response('unexpected'));
-        test()->fail('The request was not rejected.');
-    } catch (TokenMismatchException) {
-        expect(true)->toBeTrue();
+        $response = $this
+            ->withMiddleware(PreventRequestForgery::class)
+            ->withHeader('Sec-Fetch-Site', 'cross-site')
+            ->post('/login', [
+                'email' => 'person@example.test',
+                'password' => 'StrongPassword42',
+            ]);
+
+        $response->assertStatus(419);
+    } finally {
+        $this->app->instance('env', 'testing');
     }
 });

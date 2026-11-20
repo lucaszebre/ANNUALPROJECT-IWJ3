@@ -5,11 +5,12 @@ namespace App\Actions\Fortify;
 use App\Models\User;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
 class CreateNewUser implements CreatesNewUsers
 {
+    use PasswordValidationRules;
+
     public function create(array $input): User
     {
         Validator::make($input, [
@@ -21,12 +22,7 @@ class CreateNewUser implements CreatesNewUsers
                 'max:255',
                 Rule::unique(User::class),
             ],
-            'password' => [
-                'required',
-                'string',
-                'confirmed',
-                Password::min(12)->letters()->mixedCase()->numbers(),
-            ],
+            'password' => $this->passwordRules(),
         ])->validate();
 
         return User::create([

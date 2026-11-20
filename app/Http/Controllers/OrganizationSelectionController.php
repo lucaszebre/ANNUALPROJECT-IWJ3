@@ -16,7 +16,7 @@ class OrganizationSelectionController extends Controller
             ->get();
 
         if ($organizations->isEmpty()) {
-            abort(403, 'Votre compte n’est rattaché à aucune organisation.');
+            return redirect()->route('organizations.select');
         }
 
         if ($organizations->count() === 1) {

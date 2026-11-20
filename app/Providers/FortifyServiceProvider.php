@@ -4,11 +4,14 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Http\Responses\GenericPasswordResetLinkResponse;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
+use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Fortify;
 
 class FortifyServiceProvider extends ServiceProvider
@@ -20,6 +23,15 @@ class FortifyServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->app->singleton(
+            FailedPasswordResetLinkRequestResponse::class,
+            GenericPasswordResetLinkResponse::class
+        );
+        $this->app->singleton(
+            SuccessfulPasswordResetLinkRequestResponse::class,
+            GenericPasswordResetLinkResponse::class
+        );
+
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
 

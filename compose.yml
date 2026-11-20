@@ -11,7 +11,6 @@ x-php-service: &php-service
     - vendor:/var/www/html/vendor # keeps dependencies off the (slow) host bind mount
   environment: &php-env
     # Inside Docker the services are reached by name, not 127.0.0.1.
-    APP_KEY: ${APP_KEY:?Set APP_KEY in .env}
     DB_HOST: postgres
     DB_PORT: "5432"
     DB_DATABASE: ${DB_DATABASE:?Set DB_DATABASE in .env}

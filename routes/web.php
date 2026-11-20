@@ -17,6 +17,5 @@ Route::middleware('auth')->group(function (): void {
 
     Route::middleware('organization.selected')->group(function (): void {
         Route::view('/dashboard', 'dashboard')->name('dashboard');
-
     });
 });

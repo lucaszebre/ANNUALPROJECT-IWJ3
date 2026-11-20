@@ -28,7 +28,7 @@ class EnsureCurrentOrganization
             return redirect()
                 ->route('organizations.select')
                 ->withErrors([
-                    'organization_id' => 'Cette organisation n’est plus accessible.',
+                    'organization_id' => __('organizations.no_longer_accessible'),
                 ]);
         }
 

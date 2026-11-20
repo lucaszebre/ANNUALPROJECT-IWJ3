@@ -25,7 +25,8 @@ it('rejects a password reset for an unknown email', function () {
         'email' => 'unknown@example.test',
     ]);
 
-    $response->assertSessionHasErrors('email');
+    $response->assertSessionHasNoErrors();
+    $response->assertSessionHas('status');
     Notification::assertNothingSent();
 });
 

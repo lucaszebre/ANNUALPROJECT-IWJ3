@@ -8,7 +8,6 @@ function membershipAttributes(): array
 {
     return [
         'id' => fake()->uuid(),
-        // Remplacer la ligne suivante par une valeur réelle de MemberRole.
         'role' => MemberRole::cases()[0]->value,
     ];
 }
@@ -66,5 +65,16 @@ it('does not allow selecting a foreign organization', function () {
         ]);
 
     $response->assertNotFound();
+    $response->assertSessionMissing('current_organization_id');
+});
+
+it('allows a new account without organizations to complete login', function () {
+    $user = User::factory()->create();
+
+    $response = $this
+        ->actingAs($user)
+        ->get(route('post-login'));
+
+    $response->assertRedirect(route('organizations.select'));
     $response->assertSessionMissing('current_organization_id');
 });
