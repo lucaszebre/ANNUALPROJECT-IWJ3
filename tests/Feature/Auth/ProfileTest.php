@@ -146,3 +146,80 @@ it('refuses to change the email with a wrong current password', function () {
 
     expect($user->refresh()->email)->toBe('camille@example.test');
 });
+
+it('asks for the current password in French when changing the email without it', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->from(route('profile'))
+        ->followingRedirects()
+        ->put(route('user-profile-information.update'), ['name' => $user->name, 'email' => 'new@example.test'])
+        ->assertSee('Saisissez votre mot de passe actuel pour changer d’adresse email.', false);
+});
+
+it('blocks both forms after five wrong current passwords', function () {
+    $user = User::factory()->create(['password' => 'OldPassword4242']);
+    $this->actingAs($user)->from(route('profile'));
+
+    foreach (range(1, 3) as $_) {
+        $this->put(route('user-password.update'), [
+            'current_password' => 'wrong-password',
+            'password' => 'NewPassword4242',
+            'password_confirmation' => 'NewPassword4242',
+        ])->assertSessionHasErrors('current_password');
+    }
+
+    foreach (range(1, 2) as $_) {
+        $this->put(route('user-profile-information.update'), [
+            'name' => $user->name,
+            'email' => 'attacker@example.test',
+            'email_current_password' => 'wrong-password',
+        ])->assertSessionHasErrors('email_current_password');
+    }
+
+    // Even the right password is refused until the limit resets.
+    $this->put(route('user-password.update'), [
+        'current_password' => 'OldPassword4242',
+        'password' => 'NewPassword4242',
+        'password_confirmation' => 'NewPassword4242',
+    ])->assertStatus(429)->assertHeader('Retry-After');
+
+    $this->put(route('user-profile-information.update'), [
+        'name' => $user->name,
+        'email' => $user->email,
+    ])->assertStatus(429);
+
+    expect(Hash::check('OldPassword4242', $user->refresh()->password))->toBeTrue();
+});
+
+it('only counts wrong current passwords and resets after a right one', function () {
+    $user = User::factory()->create(['password' => 'OldPassword4242']);
+    $this->actingAs($user)->from(route('profile'));
+
+    $wrongGuess = fn () => $this->put(route('user-password.update'), [
+        'current_password' => 'wrong-password',
+        'password' => 'NewPassword4242',
+        'password_confirmation' => 'NewPassword4242',
+    ])->assertSessionHasErrors('current_password');
+
+    foreach (range(1, 4) as $_) {
+        $wrongGuess();
+    }
+
+    // Saves without a password, or with a weak new one, are not guesses.
+    foreach (range(1, 3) as $_) {
+        $this->put(route('user-profile-information.update'), ['name' => 'Camille', 'email' => $user->email])
+            ->assertSessionHasNoErrors();
+    }
+
+    $this->put(route('user-password.update'), [
+        'current_password' => 'OldPassword4242',
+        'password' => 'weak',
+        'password_confirmation' => 'weak',
+    ])->assertSessionHasErrors('password');
+
+    // The right password above reset the count.
+    foreach (range(1, 4) as $_) {
+        $wrongGuess();
+    }
+});
