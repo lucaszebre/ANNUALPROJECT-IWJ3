@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\MemberRole;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -20,6 +21,9 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasUuids, Notifiable;
 
+    /**
+     * @return HasMany<Membership, $this>
+     */
     public function memberships(): HasMany
     {
         return $this->hasMany(Membership::class);
@@ -31,6 +35,14 @@ class User extends Authenticatable
             ->using(Membership::class)
             ->withPivot('id', 'role')
             ->withTimestamps();
+    }
+
+    /**
+     * The user's role in an organisation, or null if they are not a member.
+     */
+    public function roleIn(string $organizationId): ?MemberRole
+    {
+        return $this->memberships()->where('organization_id', $organizationId)->first()?->role;
     }
 
     public function ownedCourses(): HasMany

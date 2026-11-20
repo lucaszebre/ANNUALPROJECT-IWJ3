@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 
 /**
  * The link between a user and an organisation, with the user's role in it.
+ *
+ * @property MemberRole $role
  */
 #[Fillable(['organization_id', 'user_id', 'role'])]
 class Membership extends Pivot

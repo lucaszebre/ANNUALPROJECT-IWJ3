@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @property VideoStatus $status
@@ -43,6 +44,29 @@ class Video extends Model
     public function playbackEvents(): HasMany
     {
         return $this->hasMany(PlaybackEvent::class);
+    }
+
+    /**
+     * What the player loads. The route checks the user may watch the lesson.
+     */
+    public function playlistUrl(): string
+    {
+        return route('videos.hls.master', $this);
+    }
+
+    /**
+     * A signed URL: the bucket is private. Only call it for a user allowed to see the lesson.
+     */
+    public function thumbnailUrl(): ?string
+    {
+        if ($this->thumbnail_path === null) {
+            return null;
+        }
+
+        return Storage::disk('s3_signing')->temporaryUrl(
+            $this->thumbnail_path,
+            now()->addMinutes(config('videos.playback_url_ttl_minutes')),
+        );
     }
 
     /**
