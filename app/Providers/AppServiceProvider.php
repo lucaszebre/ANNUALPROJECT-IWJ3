@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Enums\MemberRole;
 use App\Models\User;
+use App\Support\CurrentOrganization;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -14,7 +15,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // One per request or queued job (see CurrentOrganization).
+        $this->app->scoped(CurrentOrganization::class);
     }
 
     /**
