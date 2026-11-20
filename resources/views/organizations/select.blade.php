@@ -1,25 +1,29 @@
-<x-guest-layout>
-    <h1>Choisir une organisation</h1>
+{{-- Shown after login when the user belongs to several organisations. No mockup: styled like the account pages. --}}
+<x-layouts.app title="Choisir une organisation">
+    <div class="page-x py-10">
+        <div class="mx-auto max-w-[568px] pt-4 sm:pt-8">
+            <p class="text-2xs font-semibold text-primary uppercase">Mon compte</p>
+            <h1 class="mt-5 text-title leading-[1.22] tracking-[-0.03em] sm:text-[40px]">Choisir une organisation</h1>
+            <p class="mt-5 text-body-lg text-muted">Les cours et votre progression dépendent de l’organisation choisie.</p>
 
-    @if ($organizations->isEmpty())
-        <p>Votre compte n’est rattaché à aucune organisation.</p>
-    @else
-        <form method="POST" action="{{ route('organizations.select.store') }}">
-            @csrf
+            @if ($organizations->isEmpty())
+                <x-alert type="warning" class="mt-10">Votre compte n’est rattaché à aucune organisation.</x-alert>
+            @else
+                <form method="POST" action="{{ route('organizations.select.store') }}" class="mt-10 flex flex-col gap-[34px]" novalidate>
+                    @csrf
 
-            <label for="organization_id">Organisation</label>
-            <select id="organization_id" name="organization_id" required autofocus>
-                <option value="">Sélectionner…</option>
-                @foreach ($organizations as $organization)
-                    <option value="{{ $organization->id }}">
-                        {{ $organization->name }}
-                    </option>
-                @endforeach
-            </select>
+                    <x-select
+                        name="organization_id"
+                        label="Organisation"
+                        placeholder="Sélectionner…"
+                        :options="$organizations->pluck('name', 'id')->all()"
+                        required
+                        autofocus
+                    />
 
-            @error('organization_id') <p>{{ $message }}</p> @enderror
-
-            <button type="submit">Continuer</button>
-        </form>
-    @endif
-</x-guest-layout>
+                    <x-button class="w-full">Continuer <span aria-hidden="true">→</span></x-button>
+                </form>
+            @endif
+        </div>
+    </div>
+</x-layouts.app>

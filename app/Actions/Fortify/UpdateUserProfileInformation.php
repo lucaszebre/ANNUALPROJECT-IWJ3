@@ -30,7 +30,17 @@ class UpdateUserProfileInformation implements UpdatesUserProfileInformation
                 'max:255',
                 Rule::unique('users')->ignore($user->id),
             ],
-        ])->validateWithBag('updateProfileInformation');
+
+            'email_current_password' => [
+                Rule::requiredIf(fn () => ($input['email'] ?? null) !== $user->email),
+                'nullable',
+                'string',
+                'current_password:web',
+            ],
+        ], [
+            'email_current_password.required' => __('Saisissez votre mot de passe actuel pour changer d’adresse email.'),
+            'email_current_password.current_password' => __('The provided password does not match your current password.'),
+        ])->validate();
 
         if ($input['email'] !== $user->email &&
             $user instanceof MustVerifyEmail) {
