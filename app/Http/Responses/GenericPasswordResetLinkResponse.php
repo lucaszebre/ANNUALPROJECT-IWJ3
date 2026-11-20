@@ -4,7 +4,6 @@ namespace App\Http\Responses;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
 
@@ -14,7 +13,7 @@ class GenericPasswordResetLinkResponse implements FailedPasswordResetLinkRequest
     {
         $message = __('passwords.sent');
 
-        return $request instanceof Request && $request->wantsJson()
+        return $request->wantsJson()
             ? new JsonResponse(['message' => $message], 200)
             : back()->with('status', $message);
     }
