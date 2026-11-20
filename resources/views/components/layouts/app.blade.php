@@ -10,6 +10,12 @@
 
     <title>{{ $title ? $title.' · ' : '' }}{{ config('app.brand') }}</title>
 
+    {{-- The header monogram (x-brand): SVG for current browsers, ICO and PNG for the others. --}}
+    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="48x48">
+    <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
+    <meta name="theme-color" content="#196747">
+
     @fonts
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles

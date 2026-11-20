@@ -13,7 +13,7 @@
 
 <x-layouts.app :title="$title">
     <div class="page-x grid gap-16 py-10 xl:grid-cols-[616fr_568fr] xl:gap-28">
-        <div class="mx-auto w-full max-w-[568px] pt-4 sm:pt-8 xl:mx-0 xl:ml-12 xl:pt-[18px]">
+        <div class="w-full max-w-[568px] pt-4 sm:pt-8 xl:pt-[18px]">
             <p class="text-2xs font-semibold text-primary uppercase">{{ $eyebrow }}</p>
             <h1 class="mt-5 text-title leading-[1.22] tracking-[-0.03em] sm:text-[40px]">{{ $heading }}</h1>
             @if ($intro)
