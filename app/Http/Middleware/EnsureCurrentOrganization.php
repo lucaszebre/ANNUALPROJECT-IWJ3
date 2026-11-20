@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Organization;
 use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,12 +18,12 @@ class EnsureCurrentOrganization
             return redirect()->route('organizations.select');
         }
 
-        $isMember = $request->user()
+        $organization = $request->user()
             ->organizations()
             ->whereKey($organizationId)
-            ->exists();
+            ->first();
 
-        if (! $isMember) {
+        if (! $organization instanceof Organization) {
             $request->session()->forget('current_organization_id');
 
             return redirect()
@@ -31,6 +32,8 @@ class EnsureCurrentOrganization
                     'organization_id' => __('organizations.no_longer_accessible'),
                 ]);
         }
+
+        $request->attributes->set('current_organization', $organization);
 
         return $next($request);
     }

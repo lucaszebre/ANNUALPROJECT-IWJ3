@@ -29,9 +29,11 @@ it('shows the student header with the organisation and the account menu', functi
 
 it('adds the teaching link for teachers', function () {
     $user = User::factory()->create();
-    Membership::factory()->teacher()->for($user)->create();
+    $membership = Membership::factory()->teacher()->for($user)->create();
 
-    $this->actingAs($user)->get(route('design-system'))
+    $this->actingAs($user)
+        ->withSession(['current_organization_id' => $membership->organization_id])
+        ->get(route('design-system'))
         ->assertOk()
         ->assertSee('Mes cours')
         ->assertDontSee('Administration');
