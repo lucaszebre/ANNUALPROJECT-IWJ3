@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\OrganizationSelectionController;
+use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
@@ -14,6 +15,9 @@ Route::middleware('auth')->group(function (): void {
 
     Route::post('/organizations/select', [OrganizationSelectionController::class, 'store'])
         ->name('organizations.select.store');
+
+    // Outside 'organization.selected': the account belongs to the user, not to an organisation.
+    Route::get('/profile', ProfileController::class)->name('profile');
 
     Route::middleware('organization.selected')->group(function (): void {
         Route::view('/dashboard', 'dashboard')->name('dashboard');
