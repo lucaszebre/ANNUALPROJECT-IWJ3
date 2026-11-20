@@ -54,6 +54,14 @@ it('stores the role on the membership, per organisation', function () {
         ->and($user->organizations()->find($company->id)->pivot->role)->toBe(MemberRole::Student);
 });
 
+it('gives each lesson made by the factory the next position in its course', function () {
+    $course = Course::factory()->create();
+    Lesson::factory()->count(3)->for($course)->create();
+    Lesson::factory()->for($course)->create();
+
+    expect($course->lessons()->pluck('position')->all())->toBe([1, 2, 3, 4]);
+});
+
 it('lets lessons be reordered in one transaction', function () {
     $course = Course::factory()->create();
     [$first, $second] = Lesson::factory()->count(2)->for($course)->create();
