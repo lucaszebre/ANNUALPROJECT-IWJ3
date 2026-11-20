@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\OrganizationSelectionController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -23,6 +24,11 @@ Route::middleware('auth')->group(function (): void {
         Route::view('/dashboard', 'dashboard')->name('dashboard');
     });
 });
+
+Route::get('/catalogue', [CatalogController::class, 'index'])->name('catalog');
+Route::get('/courses/{course}', [CatalogController::class, 'show'])->whereUuid('course')->name('courses.show');
+Route::get('/courses/{course}/start', [CatalogController::class, 'start'])->whereUuid('course')
+    ->middleware('auth')->name('courses.start');
 
 // Local and tests only: the design system, to compare the components with Figma.
 if (app()->environment(['local', 'testing'])) {

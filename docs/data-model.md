@@ -117,6 +117,10 @@ erDiagram
         string slug "unique per organisation"
         text description
         string status "CourseStatus: draft | published | archived"
+        string level "CourseLevel: beginner | intermediate | advanced"
+        string cover_label "short label on the cover, e.g. PHP (title if empty)"
+        string cover_tone "CoverTone: soft | purple | sky | warning"
+        string cover_code "line of code on the cover, nullable"
         timestamp published_at
         timestamp deleted_at "soft delete"
     }
