@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\MemberRole;
-use App\Models\Concerns\BelongsToOrganization;
 use Database\Factories\MembershipFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -13,14 +12,21 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 
 /**
  * The link between a user and an organisation, with the user's role in it.
+ * Not limited to the current organisation: the profile and the role checks read all of a
+ * user's memberships.
  */
 #[Fillable(['organization_id', 'user_id', 'role'])]
 class Membership extends Pivot
 {
     /** @use HasFactory<MembershipFactory> */
-    use BelongsToOrganization, HasFactory, HasUuids;
+    use HasFactory, HasUuids;
 
     protected $table = 'memberships';
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
 
     public function user(): BelongsTo
     {

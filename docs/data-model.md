@@ -343,9 +343,13 @@ Business rule: *the data of an organisation is never accessible from another org
 
 How it works in Laravel:
 
-- A `BelongsToOrganization` trait, used by every tenant model, adds a **global scope** `where organization_id = <current organisation>` and fills `organization_id` automatically on `creating`. Developers cannot forget the filter: `Course::find($id)` on a course of another organisation returns `null`, so route model binding gives a 404.
-- A middleware resolves the current organisation from the session and refuses the request if the user is not a member of it.
-- Validation uses `Rule::exists('courses', 'id')->where('organization_id', ...)`, so an id from another organisation cannot be submitted in a form.
+- The **current organisation** (`App\Support\CurrentOrganization`, one per request or queued job) is set by the `ResolveCurrentOrganization` middleware on every web request, from the session, and only if the user is still a member of it. It runs before route model binding.
+- A `BelongsToOrganization` trait, used by every tenant model, adds a **global scope** `where organization_id = <current organisation>` and fills `organization_id` automatically on `creating`. Creating a row for another organisation throws, since `organization_id` is fillable. Developers cannot forget the filter: `Course::find($id)` on a course of another organisation returns `null`, so route model binding gives a 404.
+- Routes that read an organisation's data use the `organization.selected` middleware: without a current organisation the user is sent to the organisation picker.
+- A signed-in user who has not picked an organisation sees **no** organisation's data, and cannot create any: a new account cannot read other organisations through a route that forgot `organization.selected`.
+- Visitors, console commands, queued jobs and seeders have no current organisation and are not filtered. Visitors browse the **public catalogue**: the published courses of every organisation, as a showcase. Lessons, videos and comments need a login and a membership. The catalogue must read courses with `withoutGlobalScope(OrganizationScope::class)`, so this one cross-organisation read is explicit.
+- `memberships` is not scoped: the profile and the role checks read all of a user's organisations.
+- Validation uses `app(CurrentOrganization::class)->exists('courses')`, a `Rule::exists` limited to the current organisation, so an id from another organisation cannot be submitted in a form.
 - Feature tests check, for every resource, that a user of organisation A gets a 404 on organisation B's data.
 
 Why `organization_id` is repeated on child tables (`lessons`, `videos`, `comments`...) when it could be reached through `course_id`: the global scope works on one table without joins. It is a small, deliberate redundancy that makes every query safe by default.
