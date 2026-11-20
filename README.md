@@ -186,7 +186,7 @@ application).
 
 ## Deliverables
 
-- Business document (2 pages).
+- Business document (2 pages): [docs/business-document.pdf](docs/business-document.pdf), source in [docs/business-document.md](docs/business-document.md).
 - Wireframes and mockups.
 - SQL data model and its justification.
 - Source code in this repository.
