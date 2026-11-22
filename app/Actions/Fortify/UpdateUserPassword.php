@@ -9,6 +9,7 @@ use Laravel\Fortify\Contracts\UpdatesUserPasswords;
 
 class UpdateUserPassword implements UpdatesUserPasswords
 {
+    use LimitsCurrentPasswordGuesses;
     use PasswordValidationRules;
 
     /**
@@ -20,12 +21,14 @@ class UpdateUserPassword implements UpdatesUserPasswords
      */
     public function update(User $user, array $input): void
     {
-        Validator::make($input, [
+        $validator = Validator::make($input, [
             'current_password' => ['required', 'string', 'current_password:web'],
             'password' => $this->passwordRules(),
         ], [
             'current_password.current_password' => __('The provided password does not match your current password.'),
-        ])->validateWithBag('updatePassword');
+        ]);
+
+        $this->validateCurrentPasswordGuess($user, $validator, 'current_password');
 
         $user->forceFill([
             'password' => $input['password'],

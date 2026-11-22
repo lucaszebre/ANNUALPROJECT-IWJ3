@@ -62,10 +62,11 @@
     --radius-panel: 16px;
     --radius-overlay: 20px;
 
-    /* Fixed heights: buttons 46, fields 48, header 88 */
+    /* Fixed heights: buttons 46 (40 when small), fields 48, header 64 */
     --spacing-button: 2.875rem;
+    --spacing-button-sm: 2.5rem;
     --spacing-field: 3rem;
-    --spacing-header: 5.5rem;
+    --spacing-header: 4rem;
 }
 
 /* Page gutters: 72 px on desktop, as in the 1440 px mockups. */

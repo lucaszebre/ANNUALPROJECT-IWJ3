@@ -11,8 +11,9 @@ ARG CADDY_VERSION=2.10
 FROM php:${PHP_VERSION}-fpm-alpine AS php-base
 COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
 # Add gd / exif here later if image processing is needed.
+# ffmpeg (with ffprobe) is used by the TranscodeVideo job, which runs in the queue workers.
 RUN install-php-extensions pdo_pgsql pcntl intl zip bcmath opcache \
-    && apk add --no-cache fcgi
+    && apk add --no-cache fcgi ffmpeg
 COPY docker/php/app.ini /usr/local/etc/php/conf.d/zz-app.ini
 COPY docker/php/fpm-pool.conf /usr/local/etc/php-fpm.d/zz-app.conf
 WORKDIR /var/www/html

@@ -1,0 +1,55 @@
+name: Deploy
+
+# develop is protected and only changes through reviewed PRs whose CI passed,
+# so every push to it is deployed to the VPS.
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; a newer push waits instead of cancelling a deploy halfway.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to the VPS
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://codecampus.fun
+    steps:
+      - name: Set up the SSH key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      # The key is restricted to scripts/deploy.sh on the server: the command sent is only the branch.
+      - name: Deploy
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          BRANCH: ${{ github.ref_name }}
+        run: ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" "$BRANCH"
+
+      - name: Check the site answers
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS -o /dev/null --max-time 10 https://codecampus.fun/up; then
+              echo "Site is up."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "https://codecampus.fun/up did not answer after the deploy." >&2
+          exit 1
