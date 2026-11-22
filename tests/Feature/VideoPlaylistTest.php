@@ -16,6 +16,7 @@ beforeEach(function () {
     );
 
     $this->organization = Organization::factory()->create();
+    $this->withSession(['current_organization_id' => $this->organization->id]);
     $this->teacher = User::factory()->create();
     Membership::factory()->teacher()->for($this->organization)->for($this->teacher)->create();
 
@@ -111,6 +112,23 @@ it('refuses an enrolled student while the course is not published', function () 
 
     $this->actingAs($this->student)
         ->get(route('videos.hls.master', $this->video))
+        ->assertForbidden();
+});
+
+it('refuses a student enrolled in the same course from another organization', function () {
+    $foreignOrganization = Organization::factory()->create();
+    Membership::factory()->for($foreignOrganization)->for($this->student)->create();
+
+    $foreignCourse = Course::factory()->published()->for($foreignOrganization)->create();
+    $foreignLesson = Lesson::factory()->for($foreignCourse)->create();
+    $foreignCourse->students()->attach($this->student);
+    $foreignVideo = Video::factory()->ready()->for($foreignLesson)->create([
+        'organization_id' => $foreignOrganization->id,
+    ]);
+
+    $this->actingAs($this->student)
+        ->withSession(['current_organization_id' => $this->organization->id])
+        ->get(route('videos.hls.master', $foreignVideo))
         ->assertForbidden();
 });
 

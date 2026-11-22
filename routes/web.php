@@ -23,19 +23,17 @@ Route::middleware('auth')->group(function (): void {
 
     Route::middleware('organization.selected')->group(function (): void {
         Route::view('/dashboard', 'dashboard')->name('dashboard');
+
+        Route::post('/lessons/{lesson}/video/upload-url', [LessonVideoUploadController::class, 'create'])
+            ->name('lessons.video.upload-url');
+        Route::post('/lessons/{lesson}/video', [LessonVideoUploadController::class, 'store'])
+            ->name('lessons.video.store');
+
+        Route::get('/videos/{video}/hls/master.m3u8', [VideoPlaylistController::class, 'master'])
+            ->name('videos.hls.master');
+        Route::get('/videos/{video}/hls/{rendition}/index.m3u8', [VideoPlaylistController::class, 'rendition'])
+            ->name('videos.hls.rendition');
     });
-});
-
-Route::middleware('auth')->group(function () {
-    Route::post('/lessons/{lesson}/video/upload-url', [LessonVideoUploadController::class, 'create'])
-        ->name('lessons.video.upload-url');
-    Route::post('/lessons/{lesson}/video', [LessonVideoUploadController::class, 'store'])
-        ->name('lessons.video.store');
-
-    Route::get('/videos/{video}/hls/master.m3u8', [VideoPlaylistController::class, 'master'])
-        ->name('videos.hls.master');
-    Route::get('/videos/{video}/hls/{rendition}/index.m3u8', [VideoPlaylistController::class, 'rendition'])
-        ->name('videos.hls.rendition');
 });
 
 // Local and tests only: the design system, to compare the components with Figma.

@@ -20,6 +20,7 @@ beforeEach(function () {
     );
 
     $this->organization = Organization::factory()->create();
+    $this->withSession(['current_organization_id' => $this->organization->id]);
     $this->teacher = User::factory()->create();
     Membership::factory()->teacher()->for($this->organization)->for($this->teacher)->create();
 
@@ -67,12 +68,23 @@ it('refuses other teachers and other organisations', function () {
     $colleague = User::factory()->create();
     Membership::factory()->teacher()->for($this->organization)->for($colleague)->create();
     $outsider = User::factory()->create();
-    Membership::factory()->admin()->for(Organization::factory())->for($outsider)->create();
+    $foreignOrganization = Organization::factory()->create();
+    Membership::factory()->admin()->for($foreignOrganization)->for($outsider)->create();
 
     $this->actingAs($colleague);
     requestUploadUrl($this->lesson)->assertForbidden();
-    $this->actingAs($outsider);
+    $this->actingAs($outsider)
+        ->withSession(['current_organization_id' => $foreignOrganization->id]);
     requestUploadUrl($this->lesson)->assertForbidden();
+});
+
+it('refuses an upload URL for a lesson from another organization', function () {
+    $foreignOrganization = Organization::factory()->create();
+    $foreignCourse = Course::factory()->for($foreignOrganization)->create();
+    $foreignLesson = Lesson::factory()->for($foreignCourse)->create();
+
+    $this->actingAs($this->teacher);
+    requestUploadUrl($foreignLesson)->assertForbidden();
 });
 
 it('refuses guests', function () {
