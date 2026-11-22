@@ -35,6 +35,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      garage:
+        condition: service_healthy # the entrypoint sets the bucket CORS rules
     healthcheck:
       test: ["CMD-SHELL", "SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong"]
       interval: 5s
@@ -66,6 +68,31 @@ services:
     <<: *php-service
     user: www-data
     command: ["php", "artisan", "queue:work", "--queue=default", "--tries=3", "--sleep=3", "--max-time=3600"]
+    depends_on:
+      app:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Long jobs on the database_long connection, whose retry_after (2 h) is longer than any
+  # job timeout, so a running job is never started twice. One worker per queue (ADR-0006):
+  # a long transcription never delays the transcoding of the next upload.
+  queue-transcoding:
+    <<: *php-service
+    user: www-data
+    command: ["php", "artisan", "queue:work", "database_long", "--queue=transcoding", "--timeout=3600", "--tries=2", "--sleep=3", "--max-time=7200"]
+    depends_on:
+      app:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  queue-transcription:
+    <<: *php-service
+    user: www-data
+    command: ["php", "artisan", "queue:work", "database_long", "--queue=transcription", "--timeout=3600", "--tries=2", "--sleep=3", "--max-time=7200"]
     depends_on:
       app:
         condition: service_healthy

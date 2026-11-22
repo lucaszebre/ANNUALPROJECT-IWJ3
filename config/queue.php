@@ -41,7 +41,19 @@ return [
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
             'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
-            'after_commit' => false,
+            // A job dispatched inside a transaction waits for the commit, so its row exists.
+            'after_commit' => true,
+        ],
+
+        // Same table, for transcoding and transcription (ADR-0006). retry_after must be
+        // longer than the slowest job, or a running job would be started a second time.
+        'database_long' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => 'transcoding',
+            'retry_after' => (int) env('DB_QUEUE_LONG_RETRY_AFTER', 7200),
+            'after_commit' => true,
         ],
 
         'beanstalkd' => [

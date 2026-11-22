@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
-import { bunny } from 'laravel-vite-plugin/fonts';
+import { fontsource } from 'laravel-vite-plugin/fonts';
 import tailwindcss from '@tailwindcss/vite';
 
 // Port of the dev server. Inside Docker it comes from compose.yml (FORWARD_VITE_PORT), so the
@@ -18,11 +18,13 @@ export default defineConfig({
             input: ['resources/css/app.css', 'resources/js/app.js'],
             refresh: true,
             // Fonts of the CodeCampus design system: Manrope for titles,
-            // Inter for text, JetBrains Mono for code.
+            // Inter for text, JetBrains Mono for code. Self-hosted from the
+            // @fontsource npm packages: the build needs no font service and
+            // visitors' browsers never call a third party.
             fonts: [
-                bunny('Inter', { weights: [400, 600] }),
-                bunny('Manrope', { weights: [700] }),
-                bunny('JetBrains Mono', { weights: [400] }),
+                fontsource('Inter', { weights: [400, 600] }),
+                fontsource('Manrope', { weights: [700] }),
+                fontsource('JetBrains Mono', { weights: [400] }),
             ],
         }),
         tailwindcss(),

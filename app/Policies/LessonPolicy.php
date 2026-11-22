@@ -2,15 +2,28 @@
 
 namespace App\Policies;
 
+use App\Enums\CourseStatus;
 use App\Models\Course;
 use App\Models\Lesson;
 use App\Models\User;
 
 class LessonPolicy
 {
+    /**
+     * Whoever edits the course sees all its lessons; students see the lessons of the
+     * published courses they are enrolled in.
+     */
     public function view(User $user, Lesson $lesson): bool
     {
-        return app(CoursePolicy::class)->view($user, $lesson->course);
+        /** @var Course $course */
+        $course = $lesson->course;
+
+        if ($user->can('update', $course)) {
+            return true;
+        }
+
+        return $course->status === CourseStatus::Published
+            && $course->students()->whereKey($user->id)->exists();
     }
 
     public function create(User $user, Course $course): bool

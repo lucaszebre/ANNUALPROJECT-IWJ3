@@ -16,6 +16,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * @property CourseStatus $status
+ */
 #[Fillable(['organization_id', 'owner_id', 'category_id', 'title', 'slug', 'description', 'status', 'published_at'])]
 class Course extends Model
 {

@@ -17,7 +17,7 @@
         x-bind:aria-expanded="open"
         aria-haspopup="true"
         aria-controls="account-menu"
-        class="flex h-11 w-[192px] items-center gap-3 rounded-button border border-line bg-white pr-2.5 pl-[13px] text-label font-semibold text-ink hover:bg-canvas focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        class="flex h-button-sm items-center gap-2.5 rounded-button border border-line bg-white pr-2.5 pl-[13px] text-label font-semibold text-ink hover:bg-canvas focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary"
     >
         <x-icon name="user" />
         <span class="flex-1 text-left">Mon compte</span>

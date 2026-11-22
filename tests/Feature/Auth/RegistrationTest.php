@@ -8,6 +8,7 @@ it('registers a user and hashes their password', function () {
         'email' => 'pauline@example.test',
         'password' => 'StrongPassword42',
         'password_confirmation' => 'StrongPassword42',
+        'terms' => '1',
     ]);
 
     $response->assertRedirect('/post-login');

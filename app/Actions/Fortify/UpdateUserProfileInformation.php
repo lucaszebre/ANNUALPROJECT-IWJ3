@@ -11,6 +11,8 @@ use Laravel\Fortify\Contracts\UpdatesUserProfileInformation;
 
 class UpdateUserProfileInformation implements UpdatesUserProfileInformation
 {
+    use LimitsCurrentPasswordGuesses;
+
     /**
      * Validate and update the given user's profile information.
      *
@@ -20,7 +22,7 @@ class UpdateUserProfileInformation implements UpdatesUserProfileInformation
      */
     public function update(User $user, array $input): void
     {
-        Validator::make($input, [
+        $validator = Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
 
             'email' => [
@@ -30,7 +32,19 @@ class UpdateUserProfileInformation implements UpdatesUserProfileInformation
                 'max:255',
                 Rule::unique('users')->ignore($user->id),
             ],
-        ])->validateWithBag('updateProfileInformation');
+
+            'email_current_password' => [
+                Rule::requiredIf(fn () => ($input['email'] ?? null) !== $user->email),
+                'nullable',
+                'string',
+                'current_password:web',
+            ],
+        ], [
+            'email_current_password.required' => __('Enter your current password to change your email address.'),
+            'email_current_password.current_password' => __('The provided password does not match your current password.'),
+        ]);
+
+        $this->validateCurrentPasswordGuess($user, $validator, 'email_current_password');
 
         if ($input['email'] !== $user->email &&
             $user instanceof MustVerifyEmail) {

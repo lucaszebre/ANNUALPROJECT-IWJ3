@@ -1,0 +1,26 @@
+# Production Caddyfile (compose.prod.yml). Caddy gets the HTTPS certificates by itself.
+# Both addresses come from .env and must point to the server (DNS A record, or <ip-with-dashes>.sslip.io).
+
+# The application.
+{$SITE_ADDRESS} {
+    root * /var/www/html/public
+    encode zstd gzip
+
+    request_body {
+        max_size {$MAX_UPLOAD_SIZE:25MB}
+    }
+
+    # During a deploy the old app container stops: retry for up to 5 s, so the request reaches the
+    # new one (Docker DNS only returns running containers) instead of failing with a 502.
+    php_fastcgi app:9000 {
+        lb_try_duration 5s
+    }
+    file_server
+}
+
+# The S3 API of Garage, for the browser: video uploads and HLS playback use signed URLs on this
+# address (AWS_PUBLIC_ENDPOINT). Caddy keeps the Host header, so the signatures stay valid.
+# No body size limit here: videos go straight to the bucket, not through PHP.
+{$S3_SITE_ADDRESS} {
+    reverse_proxy garage:3900
+}
