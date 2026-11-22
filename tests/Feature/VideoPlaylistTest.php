@@ -16,6 +16,7 @@ beforeEach(function () {
     );
 
     $this->organization = Organization::factory()->create();
+    $this->withSession(['current_organization_id' => $this->organization->id]);
     $this->teacher = User::factory()->create();
     Membership::factory()->teacher()->for($this->organization)->for($this->teacher)->create();
 
