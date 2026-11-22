@@ -10,12 +10,19 @@ x-php-service: &php-service
   pull_policy: never # built by the `migrate` service
   volumes:
     - ./.env:/var/www/html/.env:ro
+
   environment: &php-env
+    # Force secure production settings.
+    APP_ENV: production
+    APP_DEBUG: "false"
+    APP_KEY: ${APP_KEY:?Set APP_KEY in .env}
+
     # Inside Docker the services are reached by name, not 127.0.0.1.
     DB_HOST: postgres
     DB_PORT: "5432"
     AWS_ENDPOINT: http://garage:3900
-    LOG_CHANNEL: stderr # read with `docker compose -f compose.prod.yml logs`
+    LOG_CHANNEL: stderr
+
   depends_on: &php-depends
     migrate:
       condition: service_completed_successfully
