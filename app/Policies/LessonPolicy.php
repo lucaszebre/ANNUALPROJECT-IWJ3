@@ -10,7 +10,10 @@ class LessonPolicy
 {
     public function view(User $user, Lesson $lesson): bool
     {
-        return app(CoursePolicy::class)->view($user, $lesson->course);
+        $course = $lesson->course()->first();
+
+        return $course instanceof Course
+            && app(CoursePolicy::class)->view($user, $course);
     }
 
     public function create(User $user, Course $course): bool
@@ -20,11 +23,17 @@ class LessonPolicy
 
     public function update(User $user, Lesson $lesson): bool
     {
-        return app(CoursePolicy::class)->canManageCourse($user, $lesson->course);
+        $course = $lesson->course()->first();
+
+        return $course instanceof Course
+            && app(CoursePolicy::class)->canManageCourse($user, $course);
     }
 
     public function delete(User $user, Lesson $lesson): bool
     {
-        return app(CoursePolicy::class)->canManageCourse($user, $lesson->course);
+        $course = $lesson->course()->first();
+
+        return $course instanceof Course
+            && app(CoursePolicy::class)->canManageCourse($user, $course);
     }
 }

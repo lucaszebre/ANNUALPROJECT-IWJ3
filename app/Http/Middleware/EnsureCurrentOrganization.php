@@ -18,9 +18,10 @@ class EnsureCurrentOrganization
             return redirect()->route('organizations.select');
         }
 
-        $organization = $request->user()
-            ->organizations()
+        $organization = Organization::query()
             ->whereKey($organizationId)
+            ->whereHas('memberships', fn ($membership) => $membership
+                ->where('user_id', $request->user()->getKey()))
             ->first();
 
         if (! $organization instanceof Organization) {
