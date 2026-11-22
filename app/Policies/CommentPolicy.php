@@ -18,15 +18,12 @@ class CommentPolicy
             && app(LessonPolicy::class)->view($user, $lesson);
     }
 
-    public function create(User $user): bool
+    public function create(User $user, Lesson $lesson): bool
     {
-        $organizationId = request()->hasSession()
-            ? request()->session()->get('current_organization_id')
-            : null;
+        $course = $lesson->course()->first();
 
-        return $user->memberships()
-            ->where('organization_id', $organizationId)
-            ->exists();
+        return $course instanceof Course
+            && app(CoursePolicy::class)->canAccessCourse($user, $course);
     }
 
     public function update(User $user, Comment $comment): bool

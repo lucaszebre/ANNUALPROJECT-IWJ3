@@ -21,6 +21,12 @@ class LessonPolicy
             return false;
         }
 
+        $coursePolicy = app(CoursePolicy::class);
+
+        if (! $coursePolicy->canAccessCourse($user, $course)) {
+            return false;
+        }
+
         if ($user->can('update', $course)) {
             return true;
         }
@@ -31,7 +37,7 @@ class LessonPolicy
 
     public function create(User $user, Course $course): bool
     {
-        return app(CoursePolicy::class)->create($user);
+        return app(CoursePolicy::class)->canManageCourse($user, $course);
     }
 
     public function update(User $user, Lesson $lesson): bool

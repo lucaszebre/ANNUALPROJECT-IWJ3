@@ -53,7 +53,7 @@ class CoursePolicy
             || ($this->hasRole($user, [MemberRole::Teacher]) && $course->owner_id === $user->getKey());
     }
 
-    private function canAccessCourse(User $user, Course $course): bool
+    public function canAccessCourse(User $user, Course $course): bool
     {
         return $course->organization_id === $this->currentOrganizationId()
             && $this->isMemberOfCurrentOrganization($user);

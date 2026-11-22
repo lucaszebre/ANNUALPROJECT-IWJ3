@@ -78,6 +78,15 @@ it('refuses other teachers and other organisations', function () {
     requestUploadUrl($this->lesson)->assertForbidden();
 });
 
+it('refuses an upload URL for a lesson from another organization', function () {
+    $foreignOrganization = Organization::factory()->create();
+    $foreignCourse = Course::factory()->for($foreignOrganization)->create();
+    $foreignLesson = Lesson::factory()->for($foreignCourse)->create();
+
+    $this->actingAs($this->teacher);
+    requestUploadUrl($foreignLesson)->assertForbidden();
+});
+
 it('refuses guests', function () {
     requestUploadUrl($this->lesson)->assertUnauthorized();
 });

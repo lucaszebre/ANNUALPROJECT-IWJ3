@@ -115,6 +115,23 @@ it('refuses an enrolled student while the course is not published', function () 
         ->assertForbidden();
 });
 
+it('refuses a student enrolled in the same course from another organization', function () {
+    $foreignOrganization = Organization::factory()->create();
+    Membership::factory()->for($foreignOrganization)->for($this->student)->create();
+
+    $foreignCourse = Course::factory()->published()->for($foreignOrganization)->create();
+    $foreignLesson = Lesson::factory()->for($foreignCourse)->create();
+    $foreignCourse->students()->attach($this->student);
+    $foreignVideo = Video::factory()->ready()->for($foreignLesson)->create([
+        'organization_id' => $foreignOrganization->id,
+    ]);
+
+    $this->actingAs($this->student)
+        ->withSession(['current_organization_id' => $this->organization->id])
+        ->get(route('videos.hls.master', $foreignVideo))
+        ->assertForbidden();
+});
+
 it('refuses guests', function () {
     $this->getJson(route('videos.hls.master', $this->video))->assertUnauthorized();
 });
