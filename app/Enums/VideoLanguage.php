@@ -13,8 +13,8 @@ enum VideoLanguage: string
     public function searchConfig(): string
     {
         return match ($this) {
-            self::French => 'fr_unaccent',
-            self::English => 'en_unaccent',
+            self::French => 'french_unaccent',
+            self::English => 'english_unaccent',
         };
     }
 }
