@@ -1,26 +1,41 @@
+
 # Production Caddyfile (compose.prod.yml). Caddy gets the HTTPS certificates by itself.
-# Both addresses come from .env and must point to the server (DNS A record, or <ip-with-dashes>.sslip.io).
+# Both addresses come from .env and must point to the server.
 
 # The application.
 {$SITE_ADDRESS} {
     root * /var/www/html/public
     encode zstd gzip
 
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+
+        # Content Security Policy
+        Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; media-src 'self' blob: https:; frame-src 'self' https:; upgrade-insecure-requests"
+    }
+
     request_body {
         max_size {$MAX_UPLOAD_SIZE:25MB}
     }
 
-    # During a deploy the old app container stops: retry for up to 5 s, so the request reaches the
-    # new one (Docker DNS only returns running containers) instead of failing with a 502.
+    # During a deploy the old app container stops: retry for up to 5 s.
     php_fastcgi app:9000 {
         lb_try_duration 5s
     }
+
     file_server
 }
 
-# The S3 API of Garage, for the browser: video uploads and HLS playback use signed URLs on this
-# address (AWS_PUBLIC_ENDPOINT). Caddy keeps the Host header, so the signatures stay valid.
-# No body size limit here: videos go straight to the bucket, not through PHP.
+# The S3 API of Garage, for the browser: video uploads and HLS playback use signed URLs.
 {$S3_SITE_ADDRESS} {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
     reverse_proxy garage:3900
 }
